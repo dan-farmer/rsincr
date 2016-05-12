@@ -9,7 +9,7 @@
 # hard-linked, so only use incremental disk space.
 #
 # Author: Dan Farmer
-# URL: TBC
+# URL: https://github.com/reedbug/rsincr.sh/
 # Version: 0.6.2
 # Licence: GPLv3+
 #
