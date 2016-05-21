@@ -30,10 +30,6 @@
 #
 # TODO: Coding style, e.g. https://google.github.io/styleguide/shell.xml
 # TODO: Comments, comments, comments!
-# TODO: '0' passes as valid FULL_BACKUP_MONTH_DAYS
-# TODO: Custom SSH options passed to rsync should be used for remoteexecute too
-# TODO: rsync options should probably be array-composed
-# TODO: Arg parsing should be aware of args starting '-' or '--' and not try to interpret them as backup job files
 
 function main {
   handle_args "$@"       # Handle arguments, print help, exit if invalid
