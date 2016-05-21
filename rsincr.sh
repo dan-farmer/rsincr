@@ -173,7 +173,6 @@ function lock {
 
 function backup {
   log INFO "Backup source     : $SOURCE_PATH"
-  SECONDS=0
   if [[ $DEST == "local" ]]; then
     log INFO "Backup destination: $DEST_PATH"
     log INFO "Starting backup..."
