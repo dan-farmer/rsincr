@@ -37,12 +37,12 @@ function main {
   log INFO "$0 starting at $DATE_PRETTY"
   load_config            # Find and source config file for this backup job
   validate_config        # Validate the imported config
-  checks                 # Basic checks on source, dest path, remote host
-  determine_backup_type  # Full or incremental backup?
   lock                   # Lock on lockfile specific to this backup job
   if [[ $? -ne 0 ]]; then
     log ERR "Couldn't acquire lock on $LOCKFILE"; finish 3
   fi
+  checks                 # Basic checks on source, dest path, remote host
+  determine_backup_type  # Full or incremental backup?
   backup                 # Run backup with rsync
   link_latest            # Point 'latest' symlink at backup we just completed
   purge                  # Purge backups older than set number of days
@@ -126,6 +126,11 @@ function validate_config {
   fi
 }
 
+function lock {
+  exec 200>$LOCKFILE
+  flock -n 200 && return 0 || return 1
+}
+
 function checks {
   if [[ ! -e "$SOURCE_PATH" ]]; then
     log ERR "Source $SOURCE_PATH doesn't exist"
@@ -160,11 +165,6 @@ function determine_backup_type {
     log INFO "Doing incremental backup"
     RSYNC_OPTS="$RSYNC_OPTS --delete --link-dest=../latest"
   fi
-}
-
-function lock {
-  exec 200>$LOCKFILE
-  flock -n 200 && return 0 || return 1
 }
 
 function backup {
