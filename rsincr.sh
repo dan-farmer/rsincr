@@ -379,6 +379,6 @@ function finish {
   fi
 }
 
-trap finish EXIT SIGHUP SIGINT SIGTERM
+trap finish SIGHUP SIGINT SIGTERM
 
 main "$@"
