@@ -71,7 +71,7 @@ function handle_args {
 function set_times {
   DATE=$(/usr/bin/date "+%FT%T")                          # Canonical datetime
   DATE_PRETTY=$(/usr/bin/date "+%F %T" --date="$DATE")    # For pretty-printing
-  DATE_SAFE=$(/usr/bin/date "+%FT%H%m%S" --date="$DATE")  # Safe for filesystem
+  DATE_SAFE=$(/usr/bin/date "+%FT%H%M%S" --date="$DATE")  # Safe for filesystem
   MONTH_DAY=$(/usr/bin/date "+%d" --date="$DATE")
   WEEK_DAY=$(/usr/bin/date "+%u" --date="$DATE")
 }
