@@ -213,14 +213,14 @@ function purge {
     for EXPIRED_BACKUP_DIR in $(find -H "$DEST_PATH" -mindepth 1 -maxdepth 1 -type d -mtime +$(($RETENTION_DAYS-1))); do
       log INFO "Purging $EXPIRED_BACKUP_DIR"
       mkdir $PWD/.empty_dir
-      rsync -r --delete --info=progress2 $PWD/.empty_dir/ "$EXPIRED_BACKUP_DIR"
+      rsync -r --delete $PWD/.empty_dir/ "$EXPIRED_BACKUP_DIR"
       rmdir $PWD/.empty_dir "$EXPIRED_BACKUP_DIR"
     done
   elif [[ $DEST == "remote" ]]; then
     for EXPIRED_BACKUP_DIR in $(remoteexecute "find -H \"$DEST_PATH\" -mindepth 1 -maxdepth 1 -type d -mtime +$(($RETENTION_DAYS-1))"); do
       log INFO "Purging $EXPIRED_BACKUP_DIR"
       mkdir "$PWD/.empty_dir"
-      rsync -r --delete --info=progress2 "$PWD/.empty_dir/" $USER@$HOST:"$EXPIRED_BACKUP_DIR"
+      rsync -r --delete "$PWD/.empty_dir/" $USER@$HOST:"$EXPIRED_BACKUP_DIR"
       rmdir "$PWD/.empty_dir"
       remoteexecute "rmdir \"$EXPIRED_BACKUP_DIR\""
     done
