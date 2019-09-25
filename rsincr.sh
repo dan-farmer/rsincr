@@ -250,21 +250,21 @@ function log {
     RESET_STDERR_FMT='\e[0m'    # Unset formatting ctrl chars
   fi
   LOGTIME=$(/usr/bin/date "+%T" | /usr/bin/tr -d "\n")
-  if [[ $1 == "ERR" ]] && [[ ! -z $2 ]] && [[ ! -t 1 ]]; then
+  if [[ $1 == "ERR" ]] && [[ -n $2 ]] && [[ ! -t 1 ]]; then
     # If stdout is a TTY, store control characters for pretty formatting in
     # variables. Otherwise, variables are empty so this won't make parsing logs
     # hard.
     echo -e "$LOGTIME ${ERR_STDERR_FMT}ERROR:${RESET_STDERR_FMT} $2" | \
       tee > /dev/stderr
-  elif [[ "$1" == "ERR" ]] && [[ ! -z "$2" ]]; then
+  elif [[ "$1" == "ERR" ]] && [[ -n "$2" ]]; then
     # If stdout is a terminal, just send our errors to stderr
     echo -e "$LOGTIME ${ERR_STDERR_FMT}ERROR:${RESET_STDERR_FMT} $2" 1>&2
-  elif [[ "$1" == "WARN" ]] && [[ ! -z "$2" ]] && [[ ! -t 1 ]]; then
+  elif [[ "$1" == "WARN" ]] && [[ -n "$2" ]] && [[ ! -t 1 ]]; then
     echo -e "$LOGTIME ${WARN_STDERR_FMT}WARN:${RESET_STDERR_FMT} $2" | \
       tee > /dev/stderr
-  elif [[ "$1" == "WARN" ]] && [[ ! -z "$2" ]]; then
+  elif [[ "$1" == "WARN" ]] && [[ -n "$2" ]]; then
     echo -e "$LOGTIME ${WARN_STDERR_FMT}WARN:${RESET_STDERR_FMT} $2" 1>&2
-  elif [[ "$1" == "INFO" ]] && [[ ! -z "$2" ]]; then
+  elif [[ "$1" == "INFO" ]] && [[ -n "$2" ]]; then
     echo -e "$LOGTIME ${INFO_STDOUT_FMT}INFO:${RESET_STDOUT_FMT} $2"
   else
     echo -e "$LOGTIME ${ERR_STDERR_FMT}ERROR:${RESET_STDERR_FMT} Logging err" \
