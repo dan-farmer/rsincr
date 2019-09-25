@@ -8,8 +8,10 @@
 import argparse
 import logging
 import sys
+import os
 import toml
 from schema import Schema, SchemaError
+import sysrsync
 
 def main():
     """Execute rsync using parsed arguments and config."""
@@ -27,7 +29,11 @@ def main():
 def backup(server, backup_job):
     """Execute rsync for backup_job."""
     logging.info('Starting backup job %s', backup_job[0])
-    pass
+    #TODO: Create destination directory if it doesn't exist?
+    sysrsync.run(source=os.path.expanduser(backup_job[1]['source_dir']),
+                 destination_ssh=server,
+                 destination=backup_job[1]['dest_dir'],
+                 options=['-a'])
 
 def parse_args():
     """Create arguments and populate variables from args.
