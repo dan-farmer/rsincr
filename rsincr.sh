@@ -37,8 +37,7 @@ function main {
   log INFO "$0 starting at $DATE_PRETTY"
   load_config            # Find and source config file for this backup job
   validate_config        # Validate the imported config
-  lock                   # Lock on lockfile specific to this backup job
-  if [[ "$?" -ne 0 ]]; then
+  if ! lock; then        # Lock on lockfile specific to this backup job
     log ERR "Couldn't acquire lock on $LOCKFILE"; finish 3
   fi
   checks                 # Basic checks on source, dest path, remote host
@@ -273,7 +272,7 @@ function log {
 }
 
 function writercfile {
-  cat <<EOF > "$RCFILE"
+  RCFILEWRITESTATUS=$(cat <<EOF > "$RCFILE"
 # Lockfile path
 # Allows setting separate locks for separate backup jobs
 LOCKFILE="./.rsincr.lock"
@@ -326,8 +325,9 @@ FULL_BACKUP=false
 # Comment out to disable purging
 RETENTION_DAYS=30
 EOF
+)
 
-  if [[ "$?" == 0 ]]; then
+  if [[ "$RCFILEWRITESTATUS" == 0 ]]; then
     log INFO "Wrote default config file to $RCFILE"; exit 0
   else	
     log ERR "Failed to write config file to $RCFILE"; exit 2
