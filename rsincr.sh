@@ -37,8 +37,7 @@ function main {
   log INFO "$0 starting at $DATE_PRETTY"
   load_config            # Find and source config file for this backup job
   validate_config        # Validate the imported config
-  lock                   # Lock on lockfile specific to this backup job
-  if [[ $? -ne 0 ]]; then
+  if ! lock; then        # Lock on lockfile specific to this backup job
     log ERR "Couldn't acquire lock on $LOCKFILE"; finish 3
   fi
   checks                 # Basic checks on source, dest path, remote host
@@ -51,11 +50,11 @@ function main {
 
 function handle_args {
   # Handle command arguments
-  if ([[ $1 == "--help" ]] || [[ $1 == "-h" ]]); then
+  if [[ "$1" == "--help" ]] || [[ "$1" == "-h" ]]; then
     printhelp
-  elif [[ $1 == "--exitcodes" ]]; then
+  elif [[ "$1" == "--exitcodes" ]]; then
     printexitcodes
-  elif [[ $1 == "--write-config-file" ]]; then
+  elif [[ "$1" == "--write-config-file" ]]; then
     RCFILE=${2:-$PWD/.rsincr.conf}
     writercfile
   elif [[ $# -le 1 ]]; then
@@ -77,9 +76,9 @@ function set_times {
 }
 
 function load_config {
-  if [[ -e $RCFILE ]]; then
+  if [[ -e "$RCFILE" ]]; then
     log INFO "Using config file \"$RCFILE\""
-    source $RCFILE
+    source "$RCFILE"
   else
     log ERR "Couldn't find config file \"$RCFILE\""
     log INFO "Use -h | --help for usage information"
@@ -97,37 +96,37 @@ function load_config {
 }
 
 function validate_config {
-  if ([[ $DEST != "remote" ]] && [[ $DEST != "local" ]]); then
+  if [[ "$DEST" != "remote" ]] && [[ "$DEST" != "local" ]]; then
     log ERR "Config error: Backup destination ('DEST') must exist and should be string 'remote' or 'local'"; finish 20
-  elif ([[ $DEST == "remote" ]] && [[ -z $HOST ]]); then
+  elif [[ "$DEST" == "remote" ]] && [[ -z "$HOST" ]]; then
     log ERR "Config error: Backup destination ('DEST') is 'remote', but HOST is not set"; finish 21
-  elif ([[ $DEST == "remote" ]] && [[ -z $USER ]]); then
+  elif [[ "$DEST" == "remote" ]] && [[ -z "$USER" ]]; then
     log ERR "Config error: Backup destination ('DEST') is 'remote', but USER is not set"; finish 22
-  elif ([[ -n $FULL_BACKUP ]] && [[ $FULL_BACKUP != true ]] && [[ $FULL_BACKUP != false ]]); then
+  elif [[ -n "$FULL_BACKUP" ]] && [[ "$FULL_BACKUP" != true ]] && [[ "$FULL_BACKUP" != false ]]; then
     log ERR "Config error: Force full backup ('FULL_BACKUP') should be 'true' or 'false' or empty"; finish 23
-  elif [[ -n $FULL_BACKUP_MONTH_DAYS ]]; then
+  elif [[ -n "$FULL_BACKUP_MONTH_DAYS" ]]; then
     # TODO: 0 passes - this should be fixed
-    for DAY in $(echo $FULL_BACKUP_MONTH_DAYS); do
+    for DAY in $FULL_BACKUP_MONTH_DAYS; do
       if [[ ! $(seq 1 31) =~ $DAY ]]; then
         log ERR "Config error: FULL_BACKUP_MONTH_DAYS should be space-separated list of integers between 1 and 31 (or omitted)"
         finish 24
       fi
     done
-  elif [[ -n $FULL_BACKUP_WEEK_DAYS ]]; then
-    for DAY in $(echo $FULL_BACKUP_WEEK_DAYS); do
+  elif [[ -n "$FULL_BACKUP_WEEK_DAYS" ]]; then
+    for DAY in $FULL_BACKUP_WEEK_DAYS; do
       if [[ ! $(seq 0 7) =~ $DAY ]]; then
         log ERR "Config error: FULL_BACKUP_WEEK_DAYS should be space-separated list of integers between 0 and 7 (or omitted)"
         finish 25
       fi
     done
-  elif ([[ -n $RETENTION_DAYS ]] && [[ ! $RETENTION_DAYS -ge 1 ]]); then
+  elif [[ -n "$RETENTION_DAYS" ]] && [[ ! "$RETENTION_DAYS" -ge 1 ]]; then
     log ERR "Config error: RETENTION_DAYS should be a positive integer (or omitted)"
     finish 26
   fi
 }
 
 function lock {
-  exec 200>$LOCKFILE
+  exec 200>"$LOCKFILE"
   flock -n 200 && return 0 || return 1
 }
 
@@ -135,10 +134,10 @@ function checks {
   if [[ ! -e "$SOURCE_PATH" ]]; then
     log ERR "Source $SOURCE_PATH doesn't exist"
     finish 30
-  elif ([[ $DEST == "local" ]] && [[ ! -e "$DEST_PATH" ]]); then
+  elif [[ "$DEST" == "local" ]] && [[ ! -e "$DEST_PATH" ]]; then
     log ERR "Local destination path $DEST_PATH doesn't exist"
     finish 31
-  elif [[ $DEST == "remote" ]]; then
+  elif [[ "$DEST" == "remote" ]]; then
     remoteexecute "exit"
     SSH_TEST_RETURN=$?
     if [[ SSH_TEST_RETURN -ne 0 ]]; then
@@ -151,15 +150,15 @@ function checks {
 }
 
 function determine_backup_type {
-  if $FULL_BACKUP; then
+  if "$FULL_BACKUP"; then
     log INFO "Full backup requested"
-  elif [[ $FULL_BACKUP_MONTH_DAYS =~ $MONTH_DAY ]]; then
+  elif [[ "$FULL_BACKUP_MONTH_DAYS" =~ $MONTH_DAY ]]; then
     log INFO "Month day is $MONTH_DAY, doing full backup"
-  elif [[ $FULL_BACKUP_WEEK_DAYS =~ $WEEK_DAY ]]; then
+  elif [[ "$FULL_BACKUP_WEEK_DAYS" =~ $WEEK_DAY ]]; then
     log INFO "Week day is $WEEK_DAY, doing full backup"
-  elif ([[ $DEST == "local" ]] && [ ! -h "$DEST_PATH/latest" ]); then
+  elif [[ "$DEST" == "local" ]] && [ ! -h "$DEST_PATH/latest" ]; then
     log INFO "No 'latest' backup pointer found locally, doing full backup"
-  elif ([[ $DEST == "remote" ]] && remoteexecute "[ ! -h \"$DEST_PATH/latest\" ]"); then
+  elif [[ "$DEST" == "remote" ]] && remoteexecute "[ ! -h \"$DEST_PATH/latest\" ]"; then
     log INFO "No 'latest' backup pointer found remotely, doing full backup"
   else
     log INFO "Doing incremental backup"
@@ -172,21 +171,21 @@ function backup {
   if [[ $DEST == "local" ]]; then
     log INFO "Backup destination: $DEST_PATH"
     log INFO "Starting backup..."
-    rsync $RSYNC_OPTS "$SOURCE_PATH/" "$DEST_PATH/back-$DATE_SAFE"
+    rsync "$RSYNC_OPTS $SOURCE_PATH/ $DEST_PATH/back-$DATE_SAFE"
     RSYNC_EXIT_STATUS=$?
     # Update mtime of the backup folder we just created
     # mtime is used later to purge old backups
     touch "$DEST_PATH/back-$DATE_SAFE"
-  elif [[ $DEST == "remote" ]]; then
+  elif [[ "$DEST" == "remote" ]]; then
     log INFO "Backup destination: $USER@$HOST:$DEST_PATH"
     log INFO "Starting backup..."
-    rsync $RSYNC_OPTS "$SOURCE_PATH/" $USER@$HOST:"$DEST_PATH/back-$DATE_SAFE"
+    rsync "$RSYNC_OPTS $SOURCE_PATH/ $USER@$HOST:$DEST_PATH/back-$DATE_SAFE"
     RSYNC_EXIT_STATUS=$?
     remoteexecute "touch \"$DEST_PATH/back-$DATE_SAFE\""
   fi
   DURATION=$SECONDS
-  log INFO "Elapsed time $(($DURATION / 3600))h $(((($DURATION / 60)) % 60))m $(($DURATION % 60))s."
-  if ([[ $RSYNC_EXIT_STATUS != 0 ]] && [[ $RSYNC_EXIT_STATUS != 24 ]]); then
+  log INFO "Elapsed time (($DURATION / 3600))h (((($DURATION / 60)) % 60))m (($DURATION % 60))s."
+  if [[ "$RSYNC_EXIT_STATUS" != 0 ]] && [[ "$RSYNC_EXIT_STATUS" != 24 ]]; then
     log ERR "Backup unsuccessful. rsync failed with status $RSYNC_EXIT_STATUS."
     log INFO "Exiting and not purging old backups."; finish 50
   fi
@@ -195,42 +194,42 @@ function backup {
 
 function link_latest {
   # Re-point $DEST_PATH/latest at new backup
-  if [[ $DEST == "local" ]]; then
+  if [[ "$DEST" == "local" ]]; then
     [ -h "$DEST_PATH/latest" ] && rm "$DEST_PATH/latest"
     ln -s "back-$DATE_SAFE" "$DEST_PATH/latest" || log WARN "Couldn't create link to latest backup"
-  elif [[ $DEST == "remote" ]]; then
+  elif [[ "$DEST" == "remote" ]]; then
     remoteexecute "[ -h \"$DEST_PATH/latest\" ] && rm \"$DEST_PATH/latest\""
     remoteexecute "ln -s \"back-$DATE_SAFE\" \"$DEST_PATH/latest\"" || log WARN "Couldn't create link to latest backup"
   fi
 }
 
 function purge {
-  OLDIFS=$IFS
+  OLDIFS="$IFS"
   IFS=$'\n'
-  if [[ -z $RETENTION_DAYS ]]; then
+  if [[ -z "$RETENTION_DAYS" ]]; then
     log INFO "Purging disabled, will not look for old backups to purge"
-  elif [[ $DEST == "local" ]]; then
-    for EXPIRED_BACKUP_DIR in $(find -H "$DEST_PATH" -mindepth 1 -maxdepth 1 -type d -mtime +$(($RETENTION_DAYS-1))); do
-      log INFO "Purging $EXPIRED_BACKUP_DIR"
-      mkdir $PWD/.empty_dir
-      rsync -r --delete $PWD/.empty_dir/ "$EXPIRED_BACKUP_DIR"
-      rmdir $PWD/.empty_dir "$EXPIRED_BACKUP_DIR"
-    done
-  elif [[ $DEST == "remote" ]]; then
-    for EXPIRED_BACKUP_DIR in $(remoteexecute "find -H \"$DEST_PATH\" -mindepth 1 -maxdepth 1 -type d -mtime +$(($RETENTION_DAYS-1))"); do
+  elif [[ "$DEST" == "local" ]]; then
+    for EXPIRED_BACKUP_DIR in $(find -H "$DEST_PATH" -mindepth 1 -maxdepth 1 -type d -mtime +(("$RETENTION_DAYS"-1))); do
       log INFO "Purging $EXPIRED_BACKUP_DIR"
       mkdir "$PWD/.empty_dir"
-      rsync -r --delete "$PWD/.empty_dir/" $USER@$HOST:"$EXPIRED_BACKUP_DIR"
+      rsync -r --delete "$PWD/.empty_dir/" "$EXPIRED_BACKUP_DIR"
+      rmdir "$PWD/.empty_dir" "$EXPIRED_BACKUP_DIR"
+    done
+  elif [[ "$DEST" == "remote" ]]; then
+    for EXPIRED_BACKUP_DIR in $(remoteexecute "find -H \"$DEST_PATH\" -mindepth 1 -maxdepth 1 -type d -mtime +(($RETENTION_DAYS-1))"); do
+      log INFO "Purging $EXPIRED_BACKUP_DIR"
+      mkdir "$PWD/.empty_dir"
+      rsync -r --delete "$PWD/.empty_dir/" "$USER"@"$HOST":"$EXPIRED_BACKUP_DIR"
       rmdir "$PWD/.empty_dir"
       remoteexecute "rmdir \"$EXPIRED_BACKUP_DIR\""
     done
   fi
-  IFS=$OLDIFS	# Reset IFS
+  IFS="$OLDIFS"	# Reset IFS
   unset -v OLDIFS
 }
 
 function remoteexecute {
-  ssh $USER@$HOST "$@"
+  ssh "$USER"@"$HOST" \""$*"\"
 }
 
 function log {
@@ -250,21 +249,21 @@ function log {
     RESET_STDERR_FMT='\e[0m'    # Unset formatting ctrl chars
   fi
   LOGTIME=$(/usr/bin/date "+%T" | /usr/bin/tr -d "\n")
-  if ([[ $1 == "ERR" ]] && [[ ! -z $2 ]] && [[ ! -t 1 ]]); then
+  if [[ $1 == "ERR" ]] && [[ -n $2 ]] && [[ ! -t 1 ]]; then
     # If stdout is a TTY, store control characters for pretty formatting in
     # variables. Otherwise, variables are empty so this won't make parsing logs
     # hard.
     echo -e "$LOGTIME ${ERR_STDERR_FMT}ERROR:${RESET_STDERR_FMT} $2" | \
       tee > /dev/stderr
-  elif ([[ $1 == "ERR" ]] && [[ ! -z $2 ]]); then
+  elif [[ "$1" == "ERR" ]] && [[ -n "$2" ]]; then
     # If stdout is a terminal, just send our errors to stderr
     echo -e "$LOGTIME ${ERR_STDERR_FMT}ERROR:${RESET_STDERR_FMT} $2" 1>&2
-  elif ([[ $1 == "WARN" ]] && [[ ! -z $2 ]] && [[ ! -t 1 ]]); then
+  elif [[ "$1" == "WARN" ]] && [[ -n "$2" ]] && [[ ! -t 1 ]]; then
     echo -e "$LOGTIME ${WARN_STDERR_FMT}WARN:${RESET_STDERR_FMT} $2" | \
       tee > /dev/stderr
-  elif ([[ $1 == "WARN" ]] && [[ ! -z $2 ]]); then
+  elif [[ "$1" == "WARN" ]] && [[ -n "$2" ]]; then
     echo -e "$LOGTIME ${WARN_STDERR_FMT}WARN:${RESET_STDERR_FMT} $2" 1>&2
-  elif ([[ $1 == "INFO" ]] && [[ ! -z $2 ]]); then
+  elif [[ "$1" == "INFO" ]] && [[ -n "$2" ]]; then
     echo -e "$LOGTIME ${INFO_STDOUT_FMT}INFO:${RESET_STDOUT_FMT} $2"
   else
     echo -e "$LOGTIME ${ERR_STDERR_FMT}ERROR:${RESET_STDERR_FMT} Logging err" \
@@ -273,7 +272,7 @@ function log {
 }
 
 function writercfile {
-  cat <<EOF > $RCFILE
+  RCFILEWRITESTATUS=$(cat <<EOF > "$RCFILE"
 # Lockfile path
 # Allows setting separate locks for separate backup jobs
 LOCKFILE="./.rsincr.lock"
@@ -326,8 +325,9 @@ FULL_BACKUP=false
 # Comment out to disable purging
 RETENTION_DAYS=30
 EOF
+)
 
-  if [[ $? == 0 ]]; then
+  if [[ "$RCFILEWRITESTATUS" == 0 ]]; then
     log INFO "Wrote default config file to $RCFILE"; exit 0
   else	
     log ERR "Failed to write config file to $RCFILE"; exit 2
@@ -372,8 +372,8 @@ function printexitcodes {
 
 function finish {
   log INFO "$0 finishing at $(/usr/bin/date "+%F %T")"
-  if [[ -n $1 ]]; then
-    exit $1
+  if [[ -n "$1" ]]; then
+    exit "$1"
   else
     exit 1
   fi
