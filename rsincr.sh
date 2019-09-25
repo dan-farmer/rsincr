@@ -51,7 +51,7 @@ function main {
 
 function handle_args {
   # Handle command arguments
-  if ([[ "$1" == "--help" ]] || [[ "$1" == "-h" ]]); then
+  if [[ "$1" == "--help" ]] || [[ "$1" == "-h" ]]; then
     printhelp
   elif [[ "$1" == "--exitcodes" ]]; then
     printexitcodes
@@ -97,13 +97,13 @@ function load_config {
 }
 
 function validate_config {
-  if ([[ "$DEST" != "remote" ]] && [[ "$DEST" != "local" ]]); then
+  if [[ "$DEST" != "remote" ]] && [[ "$DEST" != "local" ]]; then
     log ERR "Config error: Backup destination ('DEST') must exist and should be string 'remote' or 'local'"; finish 20
-  elif ([[ "$DEST" == "remote" ]] && [[ -z "$HOST" ]]); then
+  elif [[ "$DEST" == "remote" ]] && [[ -z "$HOST" ]]; then
     log ERR "Config error: Backup destination ('DEST') is 'remote', but HOST is not set"; finish 21
-  elif ([[ "$DEST" == "remote" ]] && [[ -z "$USER" ]]); then
+  elif [[ "$DEST" == "remote" ]] && [[ -z "$USER" ]]; then
     log ERR "Config error: Backup destination ('DEST') is 'remote', but USER is not set"; finish 22
-  elif ([[ -n "$FULL_BACKUP" ]] && [[ "$FULL_BACKUP" != true ]] && [[ "$FULL_BACKUP" != false ]]); then
+  elif [[ -n "$FULL_BACKUP" ]] && [[ "$FULL_BACKUP" != true ]] && [[ "$FULL_BACKUP" != false ]]; then
     log ERR "Config error: Force full backup ('FULL_BACKUP') should be 'true' or 'false' or empty"; finish 23
   elif [[ -n "$FULL_BACKUP_MONTH_DAYS" ]]; then
     # TODO: 0 passes - this should be fixed
@@ -120,7 +120,7 @@ function validate_config {
         finish 25
       fi
     done
-  elif ([[ -n "$RETENTION_DAYS" ]] && [[ ! "$RETENTION_DAYS" -ge 1 ]]); then
+  elif [[ -n "$RETENTION_DAYS" ]] && [[ ! "$RETENTION_DAYS" -ge 1 ]]; then
     log ERR "Config error: RETENTION_DAYS should be a positive integer (or omitted)"
     finish 26
   fi
@@ -135,7 +135,7 @@ function checks {
   if [[ ! -e "$SOURCE_PATH" ]]; then
     log ERR "Source $SOURCE_PATH doesn't exist"
     finish 30
-  elif ([[ "$DEST" == "local" ]] && [[ ! -e "$DEST_PATH" ]]); then
+  elif [[ "$DEST" == "local" ]] && [[ ! -e "$DEST_PATH" ]]; then
     log ERR "Local destination path $DEST_PATH doesn't exist"
     finish 31
   elif [[ "$DEST" == "remote" ]]; then
@@ -157,9 +157,9 @@ function determine_backup_type {
     log INFO "Month day is $MONTH_DAY, doing full backup"
   elif [[ "$FULL_BACKUP_WEEK_DAYS" =~ $WEEK_DAY ]]; then
     log INFO "Week day is $WEEK_DAY, doing full backup"
-  elif ([[ "$DEST" == "local" ]] && [ ! -h "$DEST_PATH/latest" ]); then
+  elif [[ "$DEST" == "local" ]] && [ ! -h "$DEST_PATH/latest" ]; then
     log INFO "No 'latest' backup pointer found locally, doing full backup"
-  elif ([[ "$DEST" == "remote" ]] && remoteexecute "[ ! -h \"$DEST_PATH/latest\" ]"); then
+  elif [[ "$DEST" == "remote" ]] && remoteexecute "[ ! -h \"$DEST_PATH/latest\" ]"; then
     log INFO "No 'latest' backup pointer found remotely, doing full backup"
   else
     log INFO "Doing incremental backup"
@@ -186,7 +186,7 @@ function backup {
   fi
   DURATION=$SECONDS
   log INFO "Elapsed time $(($DURATION / 3600))h $(((($DURATION / 60)) % 60))m $(($DURATION % 60))s."
-  if ([[ "$RSYNC_EXIT_STATUS" != 0 ]] && [[ "$RSYNC_EXIT_STATUS" != 24 ]]); then
+  if [[ "$RSYNC_EXIT_STATUS" != 0 ]] && [[ "$RSYNC_EXIT_STATUS" != 24 ]]; then
     log ERR "Backup unsuccessful. rsync failed with status $RSYNC_EXIT_STATUS."
     log INFO "Exiting and not purging old backups."; finish 50
   fi
@@ -250,21 +250,21 @@ function log {
     RESET_STDERR_FMT='\e[0m'    # Unset formatting ctrl chars
   fi
   LOGTIME=$(/usr/bin/date "+%T" | /usr/bin/tr -d "\n")
-  if ([[ $1 == "ERR" ]] && [[ ! -z $2 ]] && [[ ! -t 1 ]]); then
+  if [[ $1 == "ERR" ]] && [[ ! -z $2 ]] && [[ ! -t 1 ]]; then
     # If stdout is a TTY, store control characters for pretty formatting in
     # variables. Otherwise, variables are empty so this won't make parsing logs
     # hard.
     echo -e "$LOGTIME ${ERR_STDERR_FMT}ERROR:${RESET_STDERR_FMT} $2" | \
       tee > /dev/stderr
-  elif ([[ "$1" == "ERR" ]] && [[ ! -z "$2" ]]); then
+  elif [[ "$1" == "ERR" ]] && [[ ! -z "$2" ]]; then
     # If stdout is a terminal, just send our errors to stderr
     echo -e "$LOGTIME ${ERR_STDERR_FMT}ERROR:${RESET_STDERR_FMT} $2" 1>&2
-  elif ([[ "$1" == "WARN" ]] && [[ ! -z "$2" ]] && [[ ! -t 1 ]]); then
+  elif [[ "$1" == "WARN" ]] && [[ ! -z "$2" ]] && [[ ! -t 1 ]]; then
     echo -e "$LOGTIME ${WARN_STDERR_FMT}WARN:${RESET_STDERR_FMT} $2" | \
       tee > /dev/stderr
-  elif ([[ "$1" == "WARN" ]] && [[ ! -z "$2" ]]); then
+  elif [[ "$1" == "WARN" ]] && [[ ! -z "$2" ]]; then
     echo -e "$LOGTIME ${WARN_STDERR_FMT}WARN:${RESET_STDERR_FMT} $2" 1>&2
-  elif ([[ "$1" == "INFO" ]] && [[ ! -z "$2" ]]); then
+  elif [[ "$1" == "INFO" ]] && [[ ! -z "$2" ]]; then
     echo -e "$LOGTIME ${INFO_STDOUT_FMT}INFO:${RESET_STDOUT_FMT} $2"
   else
     echo -e "$LOGTIME ${ERR_STDERR_FMT}ERROR:${RESET_STDERR_FMT} Logging err" \
