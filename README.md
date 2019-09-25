@@ -9,7 +9,14 @@ There are other (better?) solutions to the same problem - DIY guides, pre-existi
 This was mostly written as a technical exercise - i.e. see how functional a shell/bash script I could write, combined with poor experience and NIH fear of other solutions. It may be rewritten in Python in future. I'm currently using it for 6-hourly backups from a home NAS to off-site, as well as a handful of other applications.
 
 ## Usage
-./rsincr.sh --help
+```
+./rsincr.py [-h] [-l {DEBUG,INFO,WARNING,ERROR,CRITICAL}]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -l {DEBUG,INFO,WARNING,ERROR,CRITICAL}, --loglevel {DEBUG,INFO,WARNING,ERROR,CRITICAL}
+                        Logging/output verbosity
+```
 
 ## Logical Operations
 - A new dated backup folder is created
