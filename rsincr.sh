@@ -107,14 +107,14 @@ function validate_config {
     log ERR "Config error: Force full backup ('FULL_BACKUP') should be 'true' or 'false' or empty"; finish 23
   elif [[ -n "$FULL_BACKUP_MONTH_DAYS" ]]; then
     # TODO: 0 passes - this should be fixed
-    for DAY in $(echo "$FULL_BACKUP_MONTH_DAYS"); do
+    for DAY in $FULL_BACKUP_MONTH_DAYS; do
       if [[ ! $(seq 1 31) =~ $DAY ]]; then
         log ERR "Config error: FULL_BACKUP_MONTH_DAYS should be space-separated list of integers between 1 and 31 (or omitted)"
         finish 24
       fi
     done
   elif [[ -n "$FULL_BACKUP_WEEK_DAYS" ]]; then
-    for DAY in $(echo "$FULL_BACKUP_WEEK_DAYS"); do
+    for DAY in $FULL_BACKUP_WEEK_DAYS; do
       if [[ ! $(seq 0 7) =~ $DAY ]]; then
         log ERR "Config error: FULL_BACKUP_WEEK_DAYS should be space-separated list of integers between 0 and 7 (or omitted)"
         finish 25
