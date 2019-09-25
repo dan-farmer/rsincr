@@ -7,11 +7,24 @@
 
 import argparse
 import logging
+import toml
 
 def main():
     """Execute rsync using parsed arguments and config."""
 
     args = parse_args()
+    logging.info('Execution starting using config file %s', args.config_file.name)
+    config = toml.load(args.config_file)
+
+    server = config['destination']['server']
+
+    for backup_job in config['backup_jobs'].items():
+        backup(server, backup_job)
+
+def backup(server, backup_job):
+    """Execute rsync for backup_job."""
+    logging.info('Starting backup job %s', backup_job[0])
+    pass
 
 def parse_args():
     """Create arguments and populate variables from args.
@@ -23,6 +36,8 @@ def parse_args():
     parser.add_argument('-l', '--loglevel', type=str,
                         choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
                         help='Logging/output verbosity')
+    parser.add_argument('-c', '--config-file', type=argparse.FileType('r'), default='rsincr.toml',
+                        help='Config file (default: rsincr.toml)')
 
     args = parser.parse_args()
 

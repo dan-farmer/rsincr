@@ -1,0 +1,10 @@
+[destination]
+server = "user@backup_server"
+
+[backup_jobs.documents]
+source_dir = "~/Documents"
+dest_dir = "/mnt/backups/Documents"
+
+[backup_jobs.pictures]
+source_dir = "/home/user/Pictures"
+dest_dir = "/mnt/backups/Pictures"

@@ -11,12 +11,27 @@ This was mostly written as a technical exercise - i.e. see how functional a shel
 ## Usage
 ```
 ./rsincr.py [-h] [-l {DEBUG,INFO,WARNING,ERROR,CRITICAL}]
+                 [-c CONFIG_FILE]
 
 optional arguments:
   -h, --help            show this help message and exit
   -l {DEBUG,INFO,WARNING,ERROR,CRITICAL}, --loglevel {DEBUG,INFO,WARNING,ERROR,CRITICAL}
                         Logging/output verbosity
+  -c CONFIG_FILE, --config-file CONFIG_FILE
+                        Config file (default: rsincr.toml)
 ```
+
+## Configuration
+The [example config file](rsincr_example_config.toml) demonstrates most configuration options.
+
+### \[destination\]
+* server: Backup destination server in the form of 'hostname' or 'user@hostname' (*String*) (**No default**)
+
+### \[backup\_jobs.\*\]
+Backup jobs (i.e. source/destination pairings) to backup
+* source\_dir: Source directory on local system (*String*) (**No default**)
+* dest\_dir: Destination directory on backup server (*String*) (**No default**)
+  * Note that files will be backed up to a separate timestamped subdirectory per backup
 
 ## Logical Operations
 - A new dated backup folder is created
