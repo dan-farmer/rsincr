@@ -185,7 +185,7 @@ function backup {
     remoteexecute "touch \"$DEST_PATH/back-$DATE_SAFE\""
   fi
   DURATION=$SECONDS
-  log INFO "Elapsed time $(($DURATION / 3600))h $(((($DURATION / 60)) % 60))m $(($DURATION % 60))s."
+  log INFO "Elapsed time (($DURATION / 3600))h (((($DURATION / 60)) % 60))m (($DURATION % 60))s."
   if [[ "$RSYNC_EXIT_STATUS" != 0 ]] && [[ "$RSYNC_EXIT_STATUS" != 24 ]]; then
     log ERR "Backup unsuccessful. rsync failed with status $RSYNC_EXIT_STATUS."
     log INFO "Exiting and not purging old backups."; finish 50
@@ -210,14 +210,14 @@ function purge {
   if [[ -z "$RETENTION_DAYS" ]]; then
     log INFO "Purging disabled, will not look for old backups to purge"
   elif [[ "$DEST" == "local" ]]; then
-    for EXPIRED_BACKUP_DIR in $(find -H "$DEST_PATH" -mindepth 1 -maxdepth 1 -type d -mtime +$(($RETENTION_DAYS-1))); do
+    for EXPIRED_BACKUP_DIR in $(find -H "$DEST_PATH" -mindepth 1 -maxdepth 1 -type d -mtime +(("$RETENTION_DAYS"-1))); do
       log INFO "Purging $EXPIRED_BACKUP_DIR"
       mkdir "$PWD/.empty_dir"
       rsync -r --delete "$PWD/.empty_dir/" "$EXPIRED_BACKUP_DIR"
       rmdir "$PWD/.empty_dir" "$EXPIRED_BACKUP_DIR"
     done
   elif [[ "$DEST" == "remote" ]]; then
-    for EXPIRED_BACKUP_DIR in $(remoteexecute "find -H \"$DEST_PATH\" -mindepth 1 -maxdepth 1 -type d -mtime +$(($RETENTION_DAYS-1))"); do
+    for EXPIRED_BACKUP_DIR in $(remoteexecute "find -H \"$DEST_PATH\" -mindepth 1 -maxdepth 1 -type d -mtime +(($RETENTION_DAYS-1))"); do
       log INFO "Purging $EXPIRED_BACKUP_DIR"
       mkdir "$PWD/.empty_dir"
       rsync -r --delete "$PWD/.empty_dir/" "$USER"@"$HOST":"$EXPIRED_BACKUP_DIR"
