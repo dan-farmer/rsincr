@@ -1,3 +1,6 @@
+[global]
+#lockfile = ".rsincr.lock"
+
 [destination]
 server = "user@backup_server"
 

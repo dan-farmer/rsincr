@@ -24,6 +24,9 @@ optional arguments:
 ## Configuration
 The [example config file](rsincr_example_config.toml) demonstrates most configuration options.
 
+### \[global\]
+* lockfile: Lockfile used to ensure only one instance is running (*String*) (**Default: '.rsincr.lock'**)
+
 ### \[destination\]
 * server: Backup destination server in the form of 'hostname' or 'user@hostname' (*String*) (**No default**)
 

@@ -8,11 +8,13 @@
 import argparse
 import logging
 import sys
+import fcntl
+import atexit
 import os
 import time
 import subprocess
 import toml
-from schema import Schema, SchemaError
+from schema import Schema, SchemaError, Optional
 import sysrsync
 
 def main():
@@ -24,6 +26,18 @@ def main():
     validate_config(config)
 
     server = config['destination']['server']
+
+    # Lock the lockfile before we start backups to ensure we have only one instance running
+    lockfile = config['global'].get('lockfile', '.rsincr.lock')
+    lockfile_handle = open(lockfile, 'w')
+    try:
+        fcntl.lockf(lockfile_handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError as exception:
+        logging.error('Could not lock lockfile %s. Another instance may already be running.',
+                      lockfile)
+        raise exception
+    # Register a cleanup function to remove lockfile when we exit
+    atexit.register(remove_lockfile, lockfile)
 
     for backup_job in config['backup_jobs'].items():
         backup(server, backup_job)
@@ -76,6 +90,9 @@ def validate_config(config):
     Raise exception if config does not validate
     """
     config_schema = Schema({
+        'global': {
+            Optional('lockfile'): str
+        },
         'destination': {
             'server': str
         },
@@ -91,6 +108,10 @@ def validate_config(config):
         config_schema.validate(config)
     except SchemaError as exception:
         sys.exit(exception.code)
+
+def remove_lockfile(lockfile):
+    """Cleanup function to remove lockfile when we exit."""
+    os.remove(lockfile)
 
 if __name__ == '__main__':
     main()
