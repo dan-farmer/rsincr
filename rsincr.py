@@ -9,6 +9,8 @@ import argparse
 import logging
 import sys
 import os
+import time
+import subprocess
 import toml
 from schema import Schema, SchemaError
 import sysrsync
@@ -29,11 +31,24 @@ def main():
 def backup(server, backup_job):
     """Execute rsync for backup_job."""
     logging.info('Starting backup job %s', backup_job[0])
+    datetime = time.strftime("%Y%m%dT%H%M%S")
+    source_dir, dest_dir = backup_job[1]['source_dir'], backup_job[1]['dest_dir']
+
     #TODO: Create destination directory if it doesn't exist?
-    sysrsync.run(source=os.path.expanduser(backup_job[1]['source_dir']),
+
+    logging.info('Starting rsync of %s to %s:%s',
+                 source_dir, server, os.path.join(dest_dir, datetime))
+    sysrsync.run(source=os.path.expanduser(source_dir),
                  destination_ssh=server,
-                 destination=backup_job[1]['dest_dir'],
-                 options=['-a'])
+                 destination=os.path.join(dest_dir, datetime),
+                 options=['-a',
+                          '--delete',
+                          '--link-dest=' + os.path.join('..', 'latest')])
+
+    logging.info('Symlinking \'latest\' to \'%s\'', datetime)
+    symlink_process = subprocess.run(["ssh", server, "ln", "-sfn",
+                                      datetime, os.path.join(dest_dir, 'latest')])
+    symlink_process.check_returncode()
 
 def parse_args():
     """Create arguments and populate variables from args.
