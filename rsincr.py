@@ -26,6 +26,8 @@ def main():
     validate_config(config)
 
     server = config['destination']['server']
+    #TODO: Schedule for 'full' backups
+    #TODO: Config for global rsync options
 
     # Lock the lockfile before we start backups to ensure we have only one instance running
     lockfile = config['global'].get('lockfile', '.rsincr.lock')
@@ -42,16 +44,21 @@ def main():
     for backup_job in config['backup_jobs'].items():
         backup(server, backup_job)
 
+    #TODO: Purging
+
 def backup(server, backup_job):
     """Execute rsync for backup_job."""
     logging.info('Starting backup job %s', backup_job[0])
     datetime = time.strftime("%Y%m%dT%H%M%S")
     source_dir, dest_dir = backup_job[1]['source_dir'], backup_job[1]['dest_dir']
+    #TODO: Config for exclusions
+    #TODO: Config for compression/nocompression
 
     #TODO: Create destination directory if it doesn't exist?
 
     logging.info('Starting rsync of %s to %s:%s',
                  source_dir, server, os.path.join(dest_dir, datetime))
+    #TODO: Simulate 'full' backups by forcing rsync to diff with size/checksums only (--checksum)
     sysrsync.run(source=os.path.expanduser(source_dir),
                  destination_ssh=server,
                  destination=os.path.join(dest_dir, datetime),
@@ -76,6 +83,7 @@ def parse_args():
                         help='Logging/output verbosity')
     parser.add_argument('-c', '--config-file', type=argparse.FileType('r'), default='rsincr.toml',
                         help='Config file (default: rsincr.toml)')
+    #TODO: Argument to *force* a 'full' backup
 
     args = parser.parse_args()
 
