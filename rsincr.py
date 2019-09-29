@@ -7,7 +7,9 @@
 
 import argparse
 import logging
+import sys
 import toml
+from schema import Schema, SchemaError
 
 def main():
     """Execute rsync using parsed arguments and config."""
@@ -15,6 +17,7 @@ def main():
     args = parse_args()
     logging.info('Execution starting using config file %s', args.config_file.name)
     config = toml.load(args.config_file)
+    validate_config(config)
 
     server = config['destination']['server']
 
@@ -45,6 +48,28 @@ def parse_args():
         logging.basicConfig(level=args.loglevel)
 
     return args
+
+def validate_config(config):
+    """Validate config against schema.
+
+    Raise exception if config does not validate
+    """
+    config_schema = Schema({
+        'destination': {
+            'server': str
+        },
+        'backup_jobs': {
+            str: {
+                'source_dir': str,
+                'dest_dir': str
+            }
+        }
+    })
+
+    try:
+        config_schema.validate(config)
+    except SchemaError as exception:
+        sys.exit(exception.code)
 
 if __name__ == '__main__':
     main()
