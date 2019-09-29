@@ -4,6 +4,10 @@
 [destination]
 server = "user@backup_server"
 
+[schedule]
+full_backup_week_days = [0, 3]
+full_backup_month_days = [14, 28]
+
 [backup_jobs.documents]
 source_dir = "~/Documents"
 dest_dir = "/mnt/backups/Documents"

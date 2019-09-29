@@ -33,6 +33,10 @@ The [example config file](rsincr_example_config.toml) demonstrates most configur
 ### \[destination\]
 * server: Backup destination server in the form of 'hostname' or 'user@hostname' (*String*) (**No default**)
 
+### \[schedule\]
+* full\_backup\_week\_days: List of week days (0=Sunday) on which to perform a 'full' backup (*List of integer*) (**No default**)
+* full\_backup\_month\_days: List of days of the month on which to perform a 'full' backup (*List of integer*) (**No default**)
+
 ### \[backup\_jobs.\*\]
 Backup jobs (i.e. source/destination pairings) to backup
 * source\_dir: Source directory on local system (*String*) (**No default**)

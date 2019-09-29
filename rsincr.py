@@ -14,7 +14,7 @@ import os
 import time
 import subprocess
 import toml
-from schema import Schema, SchemaError, Optional
+from schema import Schema, SchemaError, Optional, Or
 import sysrsync
 
 def main():
@@ -29,8 +29,7 @@ def main():
     if args.force_full_backup:
         backup_type = 'full'
     else:
-        backup_type = get_backup_type()
-    #TODO: Schedule for 'full' backups
+        backup_type = get_backup_type(config)
     #TODO: Config for global rsync options
 
     # Lock the lockfile before we start backups to ensure we have only one instance running
@@ -50,8 +49,21 @@ def main():
 
     #TODO: Purging
 
-def get_backup_type():
+def get_backup_type(config):
     """Return the backup type that should be run ('incremental' or 'full')."""
+
+    try:
+        schedule = config['schedule']
+    except KeyError:
+        logging.warning('No schedule config section defined; Defaulting to incremental backup')
+        return 'incremental'
+
+    if int(time.strftime('%w')) in schedule.get('full_backup_week_days', []) or \
+            int(time.strftime('%d')) in schedule.get('full_backup_month_days', []):
+        logging.info('Performing full backup')
+        return 'full'
+
+    logging.info('Performing incremental backup')
     return 'incremental'
 
 def backup(server, backup_job, backup_type='incremental'):
@@ -117,6 +129,10 @@ def validate_config(config):
         },
         'destination': {
             'server': str
+        },
+        Optional('schedule'): {
+            Optional('full_backup_week_days'): Or([int], []),
+            Optional('full_backup_month_days'): Or([int], [])
         },
         'backup_jobs': {
             str: {
