@@ -11,7 +11,7 @@ This was mostly written as a technical exercise - i.e. see how functional a shel
 ## Usage
 ```
 ./rsincr.py [-h] [-l {DEBUG,INFO,WARNING,ERROR,CRITICAL}]
-                 [-c CONFIG_FILE]
+                 [-c CONFIG_FILE] [-f FORCE_FULL_BACKUP]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -19,6 +19,9 @@ optional arguments:
                         Logging/output verbosity
   -c CONFIG_FILE, --config-file CONFIG_FILE
                         Config file (default: rsincr.toml)
+  -f FORCE_FULL_BACKUP, --force-full-backup FORCE_FULL_BACKUP
+                        Force a 'full' backup (compare checksums of files on
+                        both sides), regardless of schedule
 ```
 
 ## Configuration

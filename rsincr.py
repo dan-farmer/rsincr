@@ -26,7 +26,10 @@ def main():
     validate_config(config)
 
     server = config['destination']['server']
-    backup_type = get_backup_type()
+    if args.force_full_backup:
+        backup_type = 'full'
+    else:
+        backup_type = get_backup_type()
     #TODO: Schedule for 'full' backups
     #TODO: Config for global rsync options
 
@@ -92,7 +95,9 @@ def parse_args():
                         help='Logging/output verbosity')
     parser.add_argument('-c', '--config-file', type=argparse.FileType('r'), default='rsincr.toml',
                         help='Config file (default: rsincr.toml)')
-    #TODO: Argument to *force* a 'full' backup
+    parser.add_argument('-f', '--force-full-backup', type=bool, default=False,
+                        help='Force a \'full\' backup (compare checksums of files on both sides), '\
+                             'regardless of schedule')
 
     args = parser.parse_args()
 
