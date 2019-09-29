@@ -26,6 +26,7 @@ def main():
     validate_config(config)
 
     server = config['destination']['server']
+    backup_type = get_backup_type()
     #TODO: Schedule for 'full' backups
     #TODO: Config for global rsync options
 
@@ -42,11 +43,15 @@ def main():
     atexit.register(remove_lockfile, lockfile)
 
     for backup_job in config['backup_jobs'].items():
-        backup(server, backup_job)
+        backup(server, backup_job, backup_type)
 
     #TODO: Purging
 
-def backup(server, backup_job):
+def get_backup_type():
+    """Return the backup type that should be run ('incremental' or 'full')."""
+    return 'incremental'
+
+def backup(server, backup_job, backup_type='incremental'):
     """Execute rsync for backup_job."""
     logging.info('Starting backup job %s', backup_job[0])
     datetime = time.strftime("%Y%m%dT%H%M%S")
@@ -58,13 +63,17 @@ def backup(server, backup_job):
 
     logging.info('Starting rsync of %s to %s:%s',
                  source_dir, server, os.path.join(dest_dir, datetime))
-    #TODO: Simulate 'full' backups by forcing rsync to diff with size/checksums only (--checksum)
+
+    rsync_options = ['-a',
+                     '--delete',
+                     '--link-dest=' + os.path.join('..', 'latest')]
+    if backup_type == 'full':
+        rsync_options.append('--checksum')
+
     sysrsync.run(source=os.path.expanduser(source_dir),
                  destination_ssh=server,
                  destination=os.path.join(dest_dir, datetime),
-                 options=['-a',
-                          '--delete',
-                          '--link-dest=' + os.path.join('..', 'latest')])
+                 options=rsync_options)
 
     logging.info('Symlinking \'latest\' to \'%s\'', datetime)
     symlink_process = subprocess.run(["ssh", server, "ln", "-sfn",
