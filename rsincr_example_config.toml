@@ -11,7 +11,9 @@ full_backup_month_days = [14, 28]
 [backup_jobs.documents]
 source_dir = "~/Documents"
 dest_dir = "/mnt/backups/Documents"
+compress = true
 
 [backup_jobs.pictures]
 source_dir = "/home/user/Pictures"
 dest_dir = "/mnt/backups/Pictures"
+compress = false

@@ -42,6 +42,7 @@ Backup jobs (i.e. source/destination pairings) to backup
 * source\_dir: Source directory on local system (*String*) (**No default**)
 * dest\_dir: Destination directory on backup server (*String*) (**No default**)
   * Note that files will be backed up to a separate timestamped subdirectory per backup
+* compress: Compress files in transfer (`rsync -z`) (*Boolean*) (**Default: False**)
 
 ## Logical Operations
 - A new dated backup folder is created
