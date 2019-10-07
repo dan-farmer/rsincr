@@ -5,6 +5,7 @@
 
 """Unit tests for rsincr."""
 
+from unittest import mock
 from freezegun import freeze_time
 import rsincr
 
@@ -43,3 +44,9 @@ def test_parse_args():
     assert set_args.loglevel == 'DEBUG'
     assert set_args.config_file.name == 'rsincr_example_config.toml'
     assert set_args.force_full_backup is True
+
+def test_remove_lockfile():
+    """Assert remove_lockfile calls os.remove on lockfile."""
+    with mock.patch('rsincr.os.remove') as mocked_remove:
+        rsincr.remove_lockfile('test_lockfile_name')
+        mocked_remove.assert_called_with('test_lockfile_name')
