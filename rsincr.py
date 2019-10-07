@@ -96,7 +96,7 @@ def backup(server, backup_job, backup_type='incremental'):
                                       datetime, os.path.join(dest_dir, 'latest')])
     symlink_process.check_returncode()
 
-def parse_args():
+def parse_args(argv=None):
     """Create arguments and populate variables from args.
 
     Return args namespace
@@ -112,7 +112,7 @@ def parse_args():
                         help='Force a \'full\' backup (compare checksums of files on both sides), '\
                              'regardless of schedule')
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     if args.loglevel:
         logging.basicConfig(level=args.loglevel)
