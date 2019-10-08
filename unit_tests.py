@@ -6,6 +6,7 @@
 """Unit tests for rsincr."""
 
 from unittest import mock
+import pytest
 from freezegun import freeze_time
 import rsincr
 
@@ -44,6 +45,41 @@ def test_parse_args():
     assert set_args.loglevel == 'DEBUG'
     assert set_args.config_file.name == 'rsincr_example_config.toml'
     assert set_args.force_full_backup is True
+
+def test_validate_config():
+    """Assert validate_config() passes with valid config and calls sys.exit with invalid config."""
+    config_minimal = {'global': {},
+                      'destination': {'server': 'test_server'},
+                      'backup_jobs': {'test_backup_job': {'source_dir': 'test_source_dir',
+                                                          'dest_dir': 'test_dest_dir'}}}
+    config_full = {'global': {'lockfile': 'test_lockfile'},
+                   'destination': {'server': 'test_server'},
+                   'schedule': {'full_backup_week_days': [0, 3],
+                                'full_backup_month_days': [14, 28]},
+                   'backup_jobs': {'test_backup_job': {'source_dir': 'test_source_dir',
+                                                       'dest_dir': 'test_dest_dir',
+                                                       'compress': True}}}
+    config_missing_section = {'destination': {'server': 'test_server'},
+                              'backup_jobs': {'test_backup_job': {'source_dir': 'test_source_dir',
+                                                                  'dest_dir': 'test_dest_dir'}}}
+    config_missing_item = {'global': {},
+                           'destination': {},
+                           'backup_jobs': {'test_backup_job': {'source_dir': 'test_source_dir',
+                                                               'dest_dir': 'test_dest_dir'}}}
+
+    assert rsincr.validate_config(config_minimal) is None
+    assert rsincr.validate_config(config_full) is None
+
+    with pytest.raises(SystemExit) as pytest_wrapped_e_missing_section:
+        rsincr.validate_config(config_missing_section)
+    assert pytest_wrapped_e_missing_section.type == SystemExit
+    assert pytest_wrapped_e_missing_section.value.code == "Missing key: 'global'"
+
+    with pytest.raises(SystemExit) as pytest_wrapped_e_missing_item:
+        rsincr.validate_config(config_missing_item)
+    assert pytest_wrapped_e_missing_item.type == SystemExit
+    assert pytest_wrapped_e_missing_item.value.code == \
+        "Key 'destination' error:\nMissing key: 'server'"
 
 def test_remove_lockfile():
     """Assert remove_lockfile calls os.remove on lockfile."""
