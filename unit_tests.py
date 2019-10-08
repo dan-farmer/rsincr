@@ -5,6 +5,8 @@
 
 """Unit tests for rsincr."""
 
+import os
+import time
 from unittest import mock
 import pytest
 from freezegun import freeze_time
@@ -30,6 +32,38 @@ def test_get_backup_type():
                                                 'full_backup_month_days': [1]}}) == 'full'
     assert rsincr.get_backup_type({'schedule': {'full_backup_week_days': [2],
                                                 'full_backup_month_days': [2]}}) == 'full'
+
+# Mock time to 2019-01-01 00:00:00 UTC (Tuesday)
+@freeze_time('2019-01-01')
+def test_backup():
+    """Assert backup() calls sysrsync.run and remote_link with expected options."""
+    datetime = time.strftime("%Y%m%dT%H%M%S")
+    test_backup_job = ('test_backup_job', {'source_dir': 'test_source_dir',
+                                           'dest_dir': 'test_dest_dir',
+                                           'compress': True})
+    with mock.patch('rsincr.sysrsync.run') as mocked_sysrsync_run, \
+            mock.patch('rsincr.remote_link') as mocked_remote_link:
+        rsincr.backup('test_server', test_backup_job, 'full')
+        mocked_sysrsync_run.assert_called_with(
+            source='test_source_dir',
+            destination_ssh='test_server',
+            destination=os.path.join('test_dest_dir', datetime),
+            options=['-a',
+                     '--delete',
+                     '--link-dest=' + os.path.join('..', 'latest'),
+                     '--checksum',
+                     '-z'])
+        mocked_remote_link.assert_called_with(datetime, 'test_server', 'test_dest_dir')
+
+# Mock time to 2019-01-01 00:00:00 UTC (Tuesday)
+@freeze_time('2019-01-01')
+def test_remote_link():
+    """Assert remote_link() calls subprocess.run with expected options."""
+    datetime = time.strftime("%Y%m%dT%H%M%S")
+    with mock.patch('rsincr.subprocess.run') as mocked_subprocess_run:
+        rsincr.remote_link(datetime, 'test_server', 'test_dest_dir')
+        mocked_subprocess_run.assert_called_with([
+            'ssh', 'test_server', 'ln', '-sfn', datetime, os.path.join('test_dest_dir', 'latest')])
 
 def test_parse_args():
     """Assert parse_args() returns expected namespace when called with argument combinations."""

@@ -67,7 +67,10 @@ def get_backup_type(config):
     return 'incremental'
 
 def backup(server, backup_job, backup_type='incremental'):
-    """Execute rsync for backup_job."""
+    """Execute rsync for backup_job.
+
+    Raises RsyncError if rsync exits non-zero
+    """
     logging.info('Starting backup job %s', backup_job[0])
     datetime = time.strftime("%Y%m%dT%H%M%S")
     source_dir, dest_dir = backup_job[1]['source_dir'], backup_job[1]['dest_dir']
@@ -91,6 +94,13 @@ def backup(server, backup_job, backup_type='incremental'):
                  destination=os.path.join(dest_dir, datetime),
                  options=rsync_options)
 
+    remote_link(datetime, server, dest_dir)
+
+def remote_link(datetime, server, dest_dir):
+    """Symlink 'latest' to a datetime-stamped backup directory.
+
+    Raises CalledProcessError on failure
+    """
     logging.info('Symlinking \'latest\' to \'%s\'', datetime)
     symlink_process = subprocess.run(["ssh", server, "ln", "-sfn",
                                       datetime, os.path.join(dest_dir, 'latest')])
