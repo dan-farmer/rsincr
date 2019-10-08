@@ -38,9 +38,9 @@ def test_get_backup_type():
 def test_backup():
     """Assert backup() calls sysrsync.run and remote_link with expected options."""
     datetime = time.strftime("%Y%m%dT%H%M%S")
-    test_backup_job = ('test_backup_job', {'source_dir': 'test_source_dir',
-                                           'dest_dir': 'test_dest_dir',
-                                           'compress': True})
+    test_backup_job = {'source_dir': 'test_source_dir',
+                       'dest_dir': 'test_dest_dir',
+                       'compress': True}
     with mock.patch('rsincr.sysrsync.run') as mocked_sysrsync_run, \
             mock.patch('rsincr.remote_link') as mocked_remote_link:
         rsincr.backup('test_server', test_backup_job, 'full')

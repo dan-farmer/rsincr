@@ -44,8 +44,9 @@ def main():
     # Register a cleanup function to remove lockfile when we exit
     atexit.register(remove_lockfile, lockfile)
 
-    for backup_job in config['backup_jobs'].items():
-        backup(server, backup_job, backup_type)
+    for backup_job_name in config['backup_jobs']:
+        logging.info('Starting backup job %s', backup_job_name)
+        backup(server, config['backup_jobs'][backup_job_name], backup_type)
 
     #TODO: Purging
 
@@ -71,9 +72,8 @@ def backup(server, backup_job, backup_type='incremental'):
 
     Raises RsyncError if rsync exits non-zero
     """
-    logging.info('Starting backup job %s', backup_job[0])
     datetime = time.strftime("%Y%m%dT%H%M%S")
-    source_dir, dest_dir = backup_job[1]['source_dir'], backup_job[1]['dest_dir']
+    source_dir, dest_dir = backup_job['source_dir'], backup_job['dest_dir']
     #TODO: Config for exclusions
 
     #TODO: Create destination directory if it doesn't exist?
@@ -86,7 +86,7 @@ def backup(server, backup_job, backup_type='incremental'):
                      '--link-dest=' + os.path.join('..', 'latest')]
     if backup_type == 'full':
         rsync_options.append('--checksum')
-    if backup_job[1].get('compress'):
+    if backup_job.get('compress'):
         rsync_options.append('-z')
 
     sysrsync.run(source=os.path.expanduser(source_dir),
