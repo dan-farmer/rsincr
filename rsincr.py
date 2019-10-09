@@ -104,9 +104,8 @@ def remote_link(datetime, server, dest_dir):
     Raises CalledProcessError on failure
     """
     logging.info('Symlinking \'latest\' to \'%s\'', datetime)
-    symlink_process = subprocess.run(["ssh", server, "ln", "-sfn",
-                                      datetime, os.path.join(dest_dir, 'latest')])
-    symlink_process.check_returncode()
+    subprocess.run(["ssh", server, "ln", "-sfn", datetime, os.path.join(dest_dir, 'latest')],
+                   check=True)
 
 def parse_args(argv=None):
     """Create arguments and populate variables from args.

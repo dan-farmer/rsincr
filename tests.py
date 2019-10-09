@@ -109,10 +109,11 @@ def test_remote_link():
         rsincr.remote_link(datetime,
                            TEST_CONFIG['destination']['server'],
                            TEST_CONFIG['backup_jobs']['job01']['dest_dir'])
-    mocked_subprocess_run.assert_called_with([
-        'ssh', TEST_CONFIG['destination']['server'],
-        'ln', '-sfn',
-        datetime, os.path.join(TEST_CONFIG['backup_jobs']['job01']['dest_dir'], 'latest')])
+    mocked_subprocess_run.assert_called_with(
+        ['ssh', TEST_CONFIG['destination']['server'],
+         'ln', '-sfn',
+         datetime, os.path.join(TEST_CONFIG['backup_jobs']['job01']['dest_dir'], 'latest')],
+        check=True)
 
 def test_parse_args():
     """Assert parse_args() returns expected namespace when called with argument combinations."""
