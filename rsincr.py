@@ -30,7 +30,7 @@ def main():
         backup_type = 'full'
     else:
         backup_type = get_backup_type(config)
-    #TODO: Config for global rsync options
+    #TODO: Config for global rsync options # pylint: disable=fixme
 
     # Lock the lockfile before we start backups to ensure we have only one instance running
     lockfile = config['global'].get('lockfile', '.rsincr.lock')
@@ -48,7 +48,7 @@ def main():
         logging.info('Starting backup job %s', backup_job_name)
         backup(server, config['backup_jobs'][backup_job_name], backup_type)
 
-    #TODO: Purging
+    #TODO: Purging # pylint: disable=fixme
 
 def get_backup_type(config):
     """Return the backup type that should be run ('incremental' or 'full')."""
@@ -75,7 +75,7 @@ def backup(server, backup_job, backup_type='incremental'):
     datetime = time.strftime("%Y%m%dT%H%M%S")
     source_dir, dest_dir = backup_job['source_dir'], backup_job['dest_dir']
 
-    #TODO: Create destination directory if it doesn't exist?
+    #TODO: Create destination directory if it doesn't exist? # pylint: disable=fixme
 
     logging.info('Starting rsync of %s to %s:%s',
                  source_dir, server, os.path.join(dest_dir, datetime))
