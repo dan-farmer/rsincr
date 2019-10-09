@@ -1,0 +1,10 @@
+# Requirements for rsincr.py
+toml
+schema
+sysrsync
+
+# Requirements for tests.py
+pylint
+pytest
+pytest-cov
+freezegun
