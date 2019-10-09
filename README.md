@@ -28,21 +28,22 @@ optional arguments:
 The [example config file](rsincr_example_config.toml) demonstrates most configuration options.
 
 ### \[global\]
-* lockfile: Lockfile used to ensure only one instance is running (*String*) (**Default: '.rsincr.lock'**)
+* lockfile: Lockfile used to ensure only one instance is running (*String*) (*Optional*) (**Default: '.rsincr.lock'**)
 
 ### \[destination\]
 * server: Backup destination server in the form of 'hostname' or 'user@hostname' (*String*) (**No default**)
 
-### \[schedule\]
-* full\_backup\_week\_days: List of week days (0=Sunday) on which to perform a 'full' backup (*List of integer*) (**No default**)
-* full\_backup\_month\_days: List of days of the month on which to perform a 'full' backup (*List of integer*) (**No default**)
+### \[schedule\] (*Optional*)
+* full\_backup\_week\_days: List of week days (0=Sunday) on which to perform a 'full' backup (*List of integer*) (*Optional*) (**No default**)
+* full\_backup\_month\_days: List of days of the month on which to perform a 'full' backup (*List of integer*) (*Optional*) (**No default**)
 
 ### \[backup\_jobs.\*\]
 Backup jobs (i.e. source/destination pairings) to backup
 * source\_dir: Source directory on local system (*String*) (**No default**)
 * dest\_dir: Destination directory on backup server (*String*) (**No default**)
   * Note that files will be backed up to a separate timestamped subdirectory per backup
-* compress: Compress files in transfer (`rsync -z`) (*Boolean*) (**Default: False**)
+* compress: Compress files in transfer (`rsync -z`) (*Boolean*) (*Optional*) (**Default: False**)
+* exclusions: Files or path patterns to exclude - see `man 1 rsync` for pattern rules (*List of string*) (*Optional*) (**No default**)
 
 ## Logical Operations
 - A new dated backup folder is created

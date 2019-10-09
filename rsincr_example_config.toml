@@ -17,3 +17,5 @@ compress = true
 source_dir = "/home/user/Pictures"
 dest_dir = "/mnt/backups/Pictures"
 compress = false
+exclude = ["excluded_file",
+           "excluded_directory/***"]

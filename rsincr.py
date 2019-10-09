@@ -74,7 +74,6 @@ def backup(server, backup_job, backup_type='incremental'):
     """
     datetime = time.strftime("%Y%m%dT%H%M%S")
     source_dir, dest_dir = backup_job['source_dir'], backup_job['dest_dir']
-    #TODO: Config for exclusions
 
     #TODO: Create destination directory if it doesn't exist?
 
@@ -88,6 +87,9 @@ def backup(server, backup_job, backup_type='incremental'):
         rsync_options.append('--checksum')
     if backup_job.get('compress'):
         rsync_options.append('-z')
+    if backup_job.get('exclude'):
+        for exclusion in backup_job['exclude']:
+            rsync_options.append(f'--exclude={exclusion}')
 
     sysrsync.run(source=os.path.expanduser(source_dir),
                  destination_ssh=server,
@@ -149,7 +151,8 @@ def validate_config(config):
             str: {
                 'source_dir': str,
                 'dest_dir': str,
-                Optional('compress'): bool
+                Optional('compress'): bool,
+                Optional('exclude'): Or([str], [])
             }
         }
     })

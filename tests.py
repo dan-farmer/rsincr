@@ -20,7 +20,8 @@ TEST_CONFIG = {'global': {'lockfile': 'lockfile01'},
                             'full_backup_month_days': [14, 28]},
                'backup_jobs': {'job01': {'source_dir': 'source01',
                                          'dest_dir': 'dest01',
-                                         'compress': True}}}
+                                         'compress': True,
+                                         'exclude': ['exclusion01']}}}
 
 # Mock time to 2019-01-01 00:00:00 UTC (Tuesday)
 @freeze_time('2019-01-01')
@@ -84,6 +85,7 @@ def test_backup():
         rsincr.backup(TEST_CONFIG['destination']['server'],
                       TEST_CONFIG['backup_jobs']['job01'],
                       'full')
+    exclusion = next(iter(TEST_CONFIG["backup_jobs"]["job01"]["exclude"]))
     mocked_sysrsync_run.assert_called_with(
         source=TEST_CONFIG['backup_jobs']['job01']['source_dir'],
         destination_ssh=TEST_CONFIG['destination']['server'],
@@ -92,7 +94,8 @@ def test_backup():
                  '--delete',
                  '--link-dest=' + os.path.join('..', 'latest'),
                  '--checksum',
-                 '-z'])
+                 '-z',
+                 f'--exclude={exclusion}'])
     mocked_remote_link.assert_called_with(datetime,
                                           TEST_CONFIG['destination']['server'],
                                           TEST_CONFIG['backup_jobs']['job01']['dest_dir'])
