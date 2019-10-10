@@ -75,7 +75,7 @@ def backup(server, backup_job, backup_type='incremental'):
     datetime = time.strftime("%Y%m%dT%H%M%S")
     source_dir, dest_dir = backup_job['source_dir'], backup_job['dest_dir']
 
-    #TODO: Create destination directory if it doesn't exist? # pylint: disable=fixme
+    remote_mkdir(server, dest_dir)
 
     logging.info('Starting rsync of %s to %s:%s',
                  source_dir, server, os.path.join(dest_dir, datetime))
@@ -97,6 +97,14 @@ def backup(server, backup_job, backup_type='incremental'):
                  options=rsync_options)
 
     remote_link(datetime, server, dest_dir)
+
+def remote_mkdir(server, dest_dir):
+    """Create directory on server if it does not exist."""
+    exists_check = subprocess.run(["ssh", server, "[[", "-d", dest_dir, "]]"], check=False)
+    if not exists_check.returncode == 0:
+        logging.warning('Destination directory \'%s\' does not exist on server \'%s\'; Creating it',
+                        dest_dir, server)
+        subprocess.run(["ssh", server, "mkdir", "-p", dest_dir], check=True)
 
 def remote_link(datetime, server, dest_dir):
     """Symlink 'latest' to a datetime-stamped backup directory.

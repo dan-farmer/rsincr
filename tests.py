@@ -81,6 +81,7 @@ def test_backup():
     """Assert backup() calls sysrsync.run and remote_link with expected options."""
     datetime = time.strftime("%Y%m%dT%H%M%S")
     with mock.patch('rsincr.sysrsync.run') as mocked_sysrsync_run, \
+         mock.patch('rsincr.remote_mkdir') as mocked_remote_mkdir, \
          mock.patch('rsincr.remote_link') as mocked_remote_link:
         rsincr.backup(TEST_CONFIG['destination']['server'],
                       TEST_CONFIG['backup_jobs']['job01'],
@@ -96,9 +97,33 @@ def test_backup():
                  '--checksum',
                  '-z',
                  f'--exclude={exclusion}'])
+    mocked_remote_mkdir.assert_called_with(TEST_CONFIG['destination']['server'],
+                                           TEST_CONFIG['backup_jobs']['job01']['dest_dir'])
     mocked_remote_link.assert_called_with(datetime,
                                           TEST_CONFIG['destination']['server'],
                                           TEST_CONFIG['backup_jobs']['job01']['dest_dir'])
+
+def test_remote_mkdir():
+    """Assert remote_mkdir() calls subprocess.run for checks and directory creation."""
+    with mock.patch('rsincr.subprocess.run') as mocked_subprocess_run:
+
+        # If directory check succeeds, subprocess.run should only be called once
+        mocked_subprocess_run.return_value.returncode = 0
+        rsincr.remote_mkdir(TEST_CONFIG['destination']['server'],
+                            TEST_CONFIG['backup_jobs']['job01']['dest_dir'])
+        mocked_subprocess_run.assert_called_once_with(
+            ['ssh', TEST_CONFIG['destination']['server'],
+             '[[', '-d', TEST_CONFIG['backup_jobs']['job01']['dest_dir'], ']]'],
+            check=False)
+
+        # If directory check fails, subprocess.run will be called a second time to mkdir
+        mocked_subprocess_run.return_value.returncode = [1, 0]
+        rsincr.remote_mkdir(TEST_CONFIG['destination']['server'],
+                            TEST_CONFIG['backup_jobs']['job01']['dest_dir'])
+        mocked_subprocess_run.assert_called_with(
+            ['ssh', TEST_CONFIG['destination']['server'],
+             'mkdir', '-p', TEST_CONFIG['backup_jobs']['job01']['dest_dir']],
+            check=True)
 
 # Mock time to 2019-01-01 00:00:00 UTC (Tuesday)
 @freeze_time('2019-01-01')
