@@ -30,6 +30,10 @@ The [example config file](rsincr_example_config.toml) demonstrates most configur
 ### \[global\]
 * lockfile: Lockfile used to ensure only one instance is running (*String*) (*Optional*) (**Default: '.rsincr.lock'**)
 
+### \[rsync\]
+* bwlimit: Bandwidth limit for rsync; Any string that is interpretable by rsync - see `man 1 rsync` (*String*) (*Optional*) (**No default**)
+* additional\_rsync\_opts: Arbitrary additional options to pass to rsync see `man 1 rsync` (*List of string*) (*Optional*) (**No default**)
+
 ### \[destination\]
 * server: Backup destination server in the form of 'hostname' or 'user@hostname' (*String*) (**No default**)
 

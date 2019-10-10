@@ -15,6 +15,8 @@ from freezegun import freeze_time
 import rsincr
 
 TEST_CONFIG = {'global': {'lockfile': 'lockfile01'},
+               'rsync': {'bwlimit': '1.5m',
+                         'additional_rsync_opts': ['--acls']},
                'destination': {'server': 'server01'},
                'schedule': {'full_backup_week_days': [0, 3],
                             'full_backup_month_days': [14, 28]},
@@ -40,6 +42,8 @@ def test_main():
         mocked_toml_load.return_value = TEST_CONFIG
         rsincr.main()
         mocked_backup.assert_called_with(TEST_CONFIG['destination']['server'],
+                                         TEST_CONFIG['rsync']['bwlimit'],
+                                         TEST_CONFIG['rsync']['additional_rsync_opts'],
                                          TEST_CONFIG['backup_jobs']['job01'],
                                          'incremental')
 
@@ -47,6 +51,8 @@ def test_main():
             config_file=mock.Mock(name='test_config_file'), force_full_backup=True, loglevel=None)
         rsincr.main()
         mocked_backup.assert_called_with(TEST_CONFIG['destination']['server'],
+                                         TEST_CONFIG['rsync']['bwlimit'],
+                                         TEST_CONFIG['rsync']['additional_rsync_opts'],
                                          TEST_CONFIG['backup_jobs']['job01'],
                                          'full')
 
@@ -84,6 +90,8 @@ def test_backup():
          mock.patch('rsincr.remote_mkdir') as mocked_remote_mkdir, \
          mock.patch('rsincr.remote_link') as mocked_remote_link:
         rsincr.backup(TEST_CONFIG['destination']['server'],
+                      TEST_CONFIG['rsync']['bwlimit'],
+                      TEST_CONFIG['rsync']['additional_rsync_opts'],
                       TEST_CONFIG['backup_jobs']['job01'],
                       'full')
     exclusion = next(iter(TEST_CONFIG["backup_jobs"]["job01"]["exclude"]))
@@ -94,6 +102,8 @@ def test_backup():
         options=['-a',
                  '--delete',
                  '--link-dest=' + os.path.join('..', 'latest'),
+                 f'--bwlimit={TEST_CONFIG["rsync"]["bwlimit"]}',
+                 *TEST_CONFIG['rsync']['additional_rsync_opts'],
                  '--checksum',
                  '-z',
                  f'--exclude={exclusion}'])

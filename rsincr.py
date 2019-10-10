@@ -30,7 +30,6 @@ def main():
         backup_type = 'full'
     else:
         backup_type = get_backup_type(config)
-    #TODO: Config for global rsync options # pylint: disable=fixme
 
     # Lock the lockfile before we start backups to ensure we have only one instance running
     lockfile = config['global'].get('lockfile', '.rsincr.lock')
@@ -46,7 +45,11 @@ def main():
 
     for backup_job_name in config['backup_jobs']:
         logging.info('Starting backup job %s', backup_job_name)
-        backup(server, config['backup_jobs'][backup_job_name], backup_type)
+        backup(server,
+               config['rsync'].get('bwlimit', False),
+               config['rsync'].get('additional_rsync_opts', False),
+               config['backup_jobs'][backup_job_name],
+               backup_type)
 
     #TODO: Purging # pylint: disable=fixme
 
@@ -67,7 +70,7 @@ def get_backup_type(config):
     logging.info('Performing incremental backup')
     return 'incremental'
 
-def backup(server, backup_job, backup_type='incremental'):
+def backup(server, bwlimit, additional_rsync_opts, backup_job, backup_type='incremental'):
     """Execute rsync for backup_job.
 
     Raises RsyncError if rsync exits non-zero
@@ -83,6 +86,11 @@ def backup(server, backup_job, backup_type='incremental'):
     rsync_options = ['-a',
                      '--delete',
                      '--link-dest=' + os.path.join('..', 'latest')]
+    if bwlimit:
+        rsync_options.append(f'--bwlimit={bwlimit}')
+    if additional_rsync_opts:
+        for rsync_opt in additional_rsync_opts:
+            rsync_options.append(rsync_opt)
     if backup_type == 'full':
         rsync_options.append('--checksum')
     if backup_job.get('compress'):
@@ -146,6 +154,10 @@ def validate_config(config):
     config_schema = Schema({
         'global': {
             Optional('lockfile'): str
+        },
+        'rsync': {
+            Optional('bwlimit'): str,
+            Optional('additional_rsync_opts'): Or([str], [])
         },
         'destination': {
             'server': str
