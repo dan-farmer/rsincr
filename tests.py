@@ -26,6 +26,14 @@ TEST_CONFIG = {'global': {'lockfile': 'lockfile01'},
                                          'compress': True,
                                          'exclude': ['exclusion01']}}}
 
+SERVER = TEST_CONFIG['destination']['server']
+BWLIMIT = TEST_CONFIG['rsync']['bwlimit']
+ADDITIONAL_RSYNC_OPTS = TEST_CONFIG['rsync']['additional_rsync_opts']
+RETENTION_DAYS = TEST_CONFIG['schedule']['retention_days']
+BACKUP_JOB = TEST_CONFIG['backup_jobs']['job01']
+DEST_DIR = BACKUP_JOB['dest_dir']
+SOURCE_DIR = BACKUP_JOB['source_dir']
+
 # Mock time to 2019-01-01 00:00:00 UTC (Tuesday)
 @freeze_time('2019-01-01')
 def test_main():
@@ -43,24 +51,15 @@ def test_main():
             config_file=mock.Mock(name='test_config_file'), force_full_backup=False, loglevel=None)
         mocked_toml_load.return_value = TEST_CONFIG
         rsincr.main()
-        mocked_backup.assert_called_with(TEST_CONFIG['destination']['server'],
-                                         TEST_CONFIG['rsync']['bwlimit'],
-                                         TEST_CONFIG['rsync']['additional_rsync_opts'],
-                                         TEST_CONFIG['backup_jobs']['job01'],
-                                         'incremental')
-        mocked_purge.assert_called_with(TEST_CONFIG['destination']['server'],
-                                        TEST_CONFIG['rsync']['additional_rsync_opts'],
-                                        TEST_CONFIG['backup_jobs']['job01'],
-                                        TEST_CONFIG['schedule']['retention_days'])
+        mocked_backup.assert_called_with(
+            SERVER, BWLIMIT, ADDITIONAL_RSYNC_OPTS, BACKUP_JOB, 'incremental')
+        mocked_purge.assert_called_with(SERVER, ADDITIONAL_RSYNC_OPTS, BACKUP_JOB, RETENTION_DAYS)
 
         mocked_parse_args.return_value = Namespace(
             config_file=mock.Mock(name='test_config_file'), force_full_backup=True, loglevel=None)
         rsincr.main()
-        mocked_backup.assert_called_with(TEST_CONFIG['destination']['server'],
-                                         TEST_CONFIG['rsync']['bwlimit'],
-                                         TEST_CONFIG['rsync']['additional_rsync_opts'],
-                                         TEST_CONFIG['backup_jobs']['job01'],
-                                         'full')
+        mocked_backup.assert_called_with(
+            SERVER, BWLIMIT, ADDITIONAL_RSYNC_OPTS, BACKUP_JOB, 'full')
 
         mocked_fcntl_lockf.side_effect = OSError
         rsincr.main()
@@ -96,37 +95,25 @@ def test_backup():
          mock.patch('rsincr.subprocess.run') as mocked_subprocess_run, \
          mock.patch('rsincr.remote_link') as mocked_remote_link:
 
-        rsincr.backup(TEST_CONFIG['destination']['server'],
-                      TEST_CONFIG['rsync']['bwlimit'],
-                      TEST_CONFIG['rsync']['additional_rsync_opts'],
-                      TEST_CONFIG['backup_jobs']['job01'],
-                      'full')
+        rsincr.backup(SERVER, BWLIMIT, ADDITIONAL_RSYNC_OPTS, BACKUP_JOB, 'full')
 
-    exclusion = next(iter(TEST_CONFIG["backup_jobs"]["job01"]["exclude"]))
     mocked_sysrsync_run.assert_called_with(
-        source=TEST_CONFIG['backup_jobs']['job01']['source_dir'],
-        destination_ssh=TEST_CONFIG['destination']['server'],
-        destination=os.path.join(TEST_CONFIG['backup_jobs']['job01']['dest_dir'], datetime),
+        source=SOURCE_DIR, destination_ssh=SERVER, destination=os.path.join(DEST_DIR, datetime),
         options=['-a',
                  '--delete',
                  '--link-dest=' + os.path.join('..', 'latest'),
-                 f'--bwlimit={TEST_CONFIG["rsync"]["bwlimit"]}',
-                 *TEST_CONFIG['rsync']['additional_rsync_opts'],
+                 f'--bwlimit={BWLIMIT}',
+                 *ADDITIONAL_RSYNC_OPTS,
                  '--checksum',
                  '-z',
-                 f'--exclude={exclusion}'])
+                 f'--exclude={next(iter(BACKUP_JOB["exclude"]))}'])
 
-    mocked_remote_mkdir.assert_called_with(TEST_CONFIG['destination']['server'],
-                                           TEST_CONFIG['backup_jobs']['job01']['dest_dir'])
+    mocked_remote_mkdir.assert_called_with(SERVER, DEST_DIR)
 
     mocked_subprocess_run.assert_called_with(
-        ['ssh', TEST_CONFIG['destination']['server'],
-         'touch', os.path.join(TEST_CONFIG['backup_jobs']['job01']['dest_dir'], datetime)],
-        check=True)
+        ['ssh', SERVER, 'touch', os.path.join(DEST_DIR, datetime)], check=True)
 
-    mocked_remote_link.assert_called_with(datetime,
-                                          TEST_CONFIG['destination']['server'],
-                                          TEST_CONFIG['backup_jobs']['job01']['dest_dir'])
+    mocked_remote_link.assert_called_with(datetime, SERVER, DEST_DIR)
 
 def test_remote_mkdir():
     """Assert remote_mkdir() calls subprocess.run for checks and directory creation."""
@@ -134,21 +121,15 @@ def test_remote_mkdir():
 
         # If directory check succeeds, subprocess.run should only be called once
         mocked_subprocess_run.return_value.returncode = 0
-        rsincr.remote_mkdir(TEST_CONFIG['destination']['server'],
-                            TEST_CONFIG['backup_jobs']['job01']['dest_dir'])
+        rsincr.remote_mkdir(SERVER, DEST_DIR)
         mocked_subprocess_run.assert_called_once_with(
-            ['ssh', TEST_CONFIG['destination']['server'],
-             '[[', '-d', TEST_CONFIG['backup_jobs']['job01']['dest_dir'], ']]'],
-            check=False)
+            ['ssh', SERVER, '[[', '-d', DEST_DIR, ']]'], check=False)
 
         # If directory check fails, subprocess.run will be called a second time to mkdir
         mocked_subprocess_run.return_value.returncode = [1, 0]
-        rsincr.remote_mkdir(TEST_CONFIG['destination']['server'],
-                            TEST_CONFIG['backup_jobs']['job01']['dest_dir'])
-        mocked_subprocess_run.assert_called_with(
-            ['ssh', TEST_CONFIG['destination']['server'],
-             'mkdir', '-p', TEST_CONFIG['backup_jobs']['job01']['dest_dir']],
-            check=True)
+        rsincr.remote_mkdir(SERVER, DEST_DIR)
+        mocked_subprocess_run.assert_called_with(['ssh', SERVER, 'mkdir', '-p', DEST_DIR],
+                                                 check=True)
 
 def test_purge():
     """Assert purge() calls subprocess.run, sysrsync.run, get_expired_backups as expected."""
@@ -158,63 +139,37 @@ def test_purge():
          mock.patch('rsincr.subprocess.run') as mocked_subprocess_run:
 
         mocked_get_expired_backups.return_value = False
-        rsincr.purge(TEST_CONFIG['destination']['server'],
-                     TEST_CONFIG['rsync']['additional_rsync_opts'],
-                     TEST_CONFIG['backup_jobs']['job01'],
-                     TEST_CONFIG['schedule']['retention_days'])
-        mocked_get_expired_backups.assert_called_with(
-            TEST_CONFIG['destination']['server'],
-            TEST_CONFIG['backup_jobs']['job01']['dest_dir'],
-            TEST_CONFIG['schedule']['retention_days'])
+        rsincr.purge(SERVER, ADDITIONAL_RSYNC_OPTS, BACKUP_JOB, RETENTION_DAYS)
+        mocked_get_expired_backups.assert_called_with(SERVER, DEST_DIR, RETENTION_DAYS)
         mocked_tempfile_temporarydirectory.assert_not_called()
         mocked_sysrsync_run.assert_not_called()
         mocked_subprocess_run.assert_not_called()
 
-        mocked_get_expired_backups.return_value = ['expired_backup_directory01']
-        mocked_tempfile_temporarydirectory.return_value.__enter__.return_value = 'tmp_empty_dir01'
-        rsincr.purge(TEST_CONFIG['destination']['server'],
-                     TEST_CONFIG['rsync']['additional_rsync_opts'],
-                     TEST_CONFIG['backup_jobs']['job01'],
-                     TEST_CONFIG['schedule']['retention_days'])
-        mocked_get_expired_backups.assert_called_with(
-            TEST_CONFIG['destination']['server'],
-            TEST_CONFIG['backup_jobs']['job01']['dest_dir'],
-            TEST_CONFIG['schedule']['retention_days'])
-        mocked_sysrsync_run.assert_called_with(
-            source='tmp_empty_dir01',
-            destination_ssh=TEST_CONFIG['destination']['server'],
-            destination='expired_backup_directory01',
-            options=['-r',
-                     '--delete',
-                     *TEST_CONFIG['rsync']['additional_rsync_opts']])
-        mocked_subprocess_run.assert_called_with(['ssh', TEST_CONFIG['destination']['server'],
-                                                  'rmdir', 'expired_backup_directory01'],
-                                                 check=True)
+        mocked_get_expired_backups.return_value = ['exp_dir01']
+        mocked_tempfile_temporarydirectory.return_value.__enter__.return_value = 'empty_dir01'
+        rsincr.purge(SERVER, ADDITIONAL_RSYNC_OPTS, BACKUP_JOB, RETENTION_DAYS)
+        mocked_get_expired_backups.assert_called_with(SERVER, DEST_DIR, RETENTION_DAYS)
+        mocked_sysrsync_run.assert_called_with(source='empty_dir01',
+                                               destination_ssh=SERVER,
+                                               destination='exp_dir01',
+                                               options=['-r', '--delete', *ADDITIONAL_RSYNC_OPTS])
+        mocked_subprocess_run.assert_called_with(['ssh', SERVER, 'rmdir', 'exp_dir01'], check=True)
 
 def test_get_expired_backups():
     """Assert purge() calls subprocess.run as expected and returns correct list."""
     with mock.patch('rsincr.subprocess.run') as mocked_subprocess_run:
 
         mocked_subprocess_run.return_value.stdout = b''
-        expired_backups = rsincr.get_expired_backups(
-            TEST_CONFIG['destination']['server'],
-            TEST_CONFIG['backup_jobs']['job01']['dest_dir'],
-            TEST_CONFIG['schedule']['retention_days'])
-        mocked_subprocess_run.assert_called_with(
-            ['ssh', TEST_CONFIG['destination']['server'],
-             'find', '-H', TEST_CONFIG['backup_jobs']['job01']['dest_dir'],
-             '-mindepth', '1', '-maxdepth', '1', '-type', 'd',
-             '-mtime', f'+{TEST_CONFIG["schedule"]["retention_days"]}'],
-            capture_output=True, check=True)
+        expired_backups = rsincr.get_expired_backups(SERVER, DEST_DIR, RETENTION_DAYS)
+        mocked_subprocess_run.assert_called_with(['ssh', SERVER, 'find', '-H', DEST_DIR,
+                                                  '-mindepth', '1', '-maxdepth', '1', '-type', 'd',
+                                                  '-mtime', f'+{RETENTION_DAYS}'],
+                                                 capture_output=True, check=True)
         assert not expired_backups
 
-        mocked_subprocess_run.return_value.stdout = \
-            b'expired_backup_directory01\nexpired_backup_directory02'
-        expired_backups = rsincr.get_expired_backups(
-            TEST_CONFIG['destination']['server'],
-            TEST_CONFIG['backup_jobs']['job01']['dest_dir'],
-            TEST_CONFIG['schedule']['retention_days'])
-        assert expired_backups == ['expired_backup_directory01', 'expired_backup_directory02']
+        mocked_subprocess_run.return_value.stdout = b'exp_dir01\nexp_dir02'
+        expired_backups = rsincr.get_expired_backups(SERVER, DEST_DIR, RETENTION_DAYS)
+        assert expired_backups == ['exp_dir01', 'exp_dir02']
 
 # Mock time to 2019-01-01 00:00:00 UTC (Tuesday)
 @freeze_time('2019-01-01')
@@ -222,16 +177,10 @@ def test_remote_link():
     """Assert remote_link() calls subprocess.run with expected options."""
     datetime = time.strftime("%Y%m%dT%H%M%S")
     with mock.patch('rsincr.subprocess.run') as mocked_subprocess_run:
-
-        rsincr.remote_link(datetime,
-                           TEST_CONFIG['destination']['server'],
-                           TEST_CONFIG['backup_jobs']['job01']['dest_dir'])
+        rsincr.remote_link(datetime, SERVER, DEST_DIR)
 
     mocked_subprocess_run.assert_called_with(
-        ['ssh', TEST_CONFIG['destination']['server'],
-         'ln', '-sfn',
-         datetime, os.path.join(TEST_CONFIG['backup_jobs']['job01']['dest_dir'], 'latest')],
-        check=True)
+        ['ssh', SERVER, 'ln', '-sfn', datetime, os.path.join(DEST_DIR, 'latest')], check=True)
 
 def test_parse_args():
     """Assert parse_args() returns expected namespace when called with argument combinations."""
