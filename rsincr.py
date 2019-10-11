@@ -56,14 +56,8 @@ def main():
 def get_backup_type(config):
     """Return the backup type that should be run ('incremental' or 'full')."""
 
-    try:
-        schedule = config['schedule']
-    except KeyError:
-        logging.warning('No schedule config section defined; Defaulting to incremental backup')
-        return 'incremental'
-
-    if int(time.strftime('%w')) in schedule.get('full_backup_week_days', []) or \
-            int(time.strftime('%d')) in schedule.get('full_backup_month_days', []):
+    if int(time.strftime('%w')) in config['schedule'].get('full_backup_week_days', []) or \
+            int(time.strftime('%d')) in config['schedule'].get('full_backup_month_days', []):
         logging.info('Performing full backup')
         return 'full'
 
@@ -162,7 +156,7 @@ def validate_config(config):
         'destination': {
             'server': str
         },
-        Optional('schedule'): {
+        'schedule': {
             Optional('full_backup_week_days'): Or([int], []),
             Optional('full_backup_month_days'): Or([int], [])
         },

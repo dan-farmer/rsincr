@@ -64,7 +64,6 @@ def test_main():
 @freeze_time('2019-01-01')
 def test_get_backup_type():
     """Assert get_backup_type() returns correct backup type when called with config combinations."""
-    assert rsincr.get_backup_type({}) == 'incremental'
     assert rsincr.get_backup_type({'schedule': {}}) == 'incremental'
     assert rsincr.get_backup_type({'schedule': {'full_backup_week_days': []}}) == 'incremental'
     assert rsincr.get_backup_type({'schedule': {'full_backup_month_days': []}}) == 'incremental'
@@ -172,7 +171,8 @@ def test_validate_config():
 
     config_minimal = copy.deepcopy(TEST_CONFIG)
     del config_minimal['global']['lockfile']
-    del config_minimal['schedule']
+    del config_minimal['schedule']['full_backup_week_days']
+    del config_minimal['schedule']['full_backup_month_days']
     del config_minimal['backup_jobs']['job01']['compress']
     assert rsincr.validate_config(config_minimal) is None
 
