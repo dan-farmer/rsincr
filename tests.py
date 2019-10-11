@@ -19,7 +19,8 @@ TEST_CONFIG = {'global': {'lockfile': 'lockfile01'},
                          'additional_rsync_opts': ['--acls']},
                'destination': {'server': 'server01'},
                'schedule': {'full_backup_week_days': [0, 3],
-                            'full_backup_month_days': [14, 28]},
+                            'full_backup_month_days': [14, 28],
+                            'retention_days': 30},
                'backup_jobs': {'job01': {'source_dir': 'source01',
                                          'dest_dir': 'dest01',
                                          'compress': True,
@@ -35,7 +36,8 @@ def test_main():
          mock.patch('rsincr.fcntl.lockf') as mocked_fcntl_lockf, \
          pytest.raises(OSError) as pytest_wrapped_e_oserror, \
          mock.patch('rsincr.atexit.register'), \
-         mock.patch('rsincr.backup') as mocked_backup:
+         mock.patch('rsincr.backup') as mocked_backup, \
+         mock.patch('rsincr.purge') as mocked_purge:
 
         mocked_parse_args.return_value = Namespace(
             config_file=mock.Mock(name='test_config_file'), force_full_backup=False, loglevel=None)
@@ -46,6 +48,10 @@ def test_main():
                                          TEST_CONFIG['rsync']['additional_rsync_opts'],
                                          TEST_CONFIG['backup_jobs']['job01'],
                                          'incremental')
+        mocked_purge.assert_called_with(TEST_CONFIG['destination']['server'],
+                                        TEST_CONFIG['rsync']['additional_rsync_opts'],
+                                        TEST_CONFIG['backup_jobs']['job01'],
+                                        TEST_CONFIG['schedule']['retention_days'])
 
         mocked_parse_args.return_value = Namespace(
             config_file=mock.Mock(name='test_config_file'), force_full_backup=True, loglevel=None)
@@ -87,12 +93,15 @@ def test_backup():
     datetime = time.strftime("%Y%m%dT%H%M%S")
     with mock.patch('rsincr.sysrsync.run') as mocked_sysrsync_run, \
          mock.patch('rsincr.remote_mkdir') as mocked_remote_mkdir, \
+         mock.patch('rsincr.subprocess.run') as mocked_subprocess_run, \
          mock.patch('rsincr.remote_link') as mocked_remote_link:
+
         rsincr.backup(TEST_CONFIG['destination']['server'],
                       TEST_CONFIG['rsync']['bwlimit'],
                       TEST_CONFIG['rsync']['additional_rsync_opts'],
                       TEST_CONFIG['backup_jobs']['job01'],
                       'full')
+
     exclusion = next(iter(TEST_CONFIG["backup_jobs"]["job01"]["exclude"]))
     mocked_sysrsync_run.assert_called_with(
         source=TEST_CONFIG['backup_jobs']['job01']['source_dir'],
@@ -106,8 +115,15 @@ def test_backup():
                  '--checksum',
                  '-z',
                  f'--exclude={exclusion}'])
+
     mocked_remote_mkdir.assert_called_with(TEST_CONFIG['destination']['server'],
                                            TEST_CONFIG['backup_jobs']['job01']['dest_dir'])
+
+    mocked_subprocess_run.assert_called_with(
+        ['ssh', TEST_CONFIG['destination']['server'],
+         'touch', os.path.join(TEST_CONFIG['backup_jobs']['job01']['dest_dir'], datetime)],
+        check=True)
+
     mocked_remote_link.assert_called_with(datetime,
                                           TEST_CONFIG['destination']['server'],
                                           TEST_CONFIG['backup_jobs']['job01']['dest_dir'])
@@ -134,15 +150,83 @@ def test_remote_mkdir():
              'mkdir', '-p', TEST_CONFIG['backup_jobs']['job01']['dest_dir']],
             check=True)
 
+def test_purge():
+    """Assert purge() calls subprocess.run, sysrsync.run, get_expired_backups as expected."""
+    with mock.patch('rsincr.get_expired_backups') as mocked_get_expired_backups, \
+         mock.patch('rsincr.tempfile.TemporaryDirectory') as mocked_tempfile_temporarydirectory, \
+         mock.patch('rsincr.sysrsync.run') as mocked_sysrsync_run, \
+         mock.patch('rsincr.subprocess.run') as mocked_subprocess_run:
+
+        mocked_get_expired_backups.return_value = False
+        rsincr.purge(TEST_CONFIG['destination']['server'],
+                     TEST_CONFIG['rsync']['additional_rsync_opts'],
+                     TEST_CONFIG['backup_jobs']['job01'],
+                     TEST_CONFIG['schedule']['retention_days'])
+        mocked_get_expired_backups.assert_called_with(
+            TEST_CONFIG['destination']['server'],
+            TEST_CONFIG['backup_jobs']['job01']['dest_dir'],
+            TEST_CONFIG['schedule']['retention_days'])
+        mocked_tempfile_temporarydirectory.assert_not_called()
+        mocked_sysrsync_run.assert_not_called()
+        mocked_subprocess_run.assert_not_called()
+
+        mocked_get_expired_backups.return_value = ['expired_backup_directory01']
+        mocked_tempfile_temporarydirectory.return_value.__enter__.return_value = 'tmp_empty_dir01'
+        rsincr.purge(TEST_CONFIG['destination']['server'],
+                     TEST_CONFIG['rsync']['additional_rsync_opts'],
+                     TEST_CONFIG['backup_jobs']['job01'],
+                     TEST_CONFIG['schedule']['retention_days'])
+        mocked_get_expired_backups.assert_called_with(
+            TEST_CONFIG['destination']['server'],
+            TEST_CONFIG['backup_jobs']['job01']['dest_dir'],
+            TEST_CONFIG['schedule']['retention_days'])
+        mocked_sysrsync_run.assert_called_with(
+            source='tmp_empty_dir01',
+            destination_ssh=TEST_CONFIG['destination']['server'],
+            destination='expired_backup_directory01',
+            options=['-r',
+                     '--delete',
+                     *TEST_CONFIG['rsync']['additional_rsync_opts']])
+        mocked_subprocess_run.assert_called_with(['ssh', TEST_CONFIG['destination']['server'],
+                                                  'rmdir', 'expired_backup_directory01'],
+                                                 check=True)
+
+def test_get_expired_backups():
+    """Assert purge() calls subprocess.run as expected and returns correct list."""
+    with mock.patch('rsincr.subprocess.run') as mocked_subprocess_run:
+
+        mocked_subprocess_run.return_value.stdout = b''
+        expired_backups = rsincr.get_expired_backups(
+            TEST_CONFIG['destination']['server'],
+            TEST_CONFIG['backup_jobs']['job01']['dest_dir'],
+            TEST_CONFIG['schedule']['retention_days'])
+        mocked_subprocess_run.assert_called_with(
+            ['ssh', TEST_CONFIG['destination']['server'],
+             'find', '-H', TEST_CONFIG['backup_jobs']['job01']['dest_dir'],
+             '-mindepth', '1', '-maxdepth', '1', '-type', 'd',
+             '-mtime', f'+{TEST_CONFIG["schedule"]["retention_days"]}'],
+            capture_output=True, check=True)
+        assert not expired_backups
+
+        mocked_subprocess_run.return_value.stdout = \
+            b'expired_backup_directory01\nexpired_backup_directory02'
+        expired_backups = rsincr.get_expired_backups(
+            TEST_CONFIG['destination']['server'],
+            TEST_CONFIG['backup_jobs']['job01']['dest_dir'],
+            TEST_CONFIG['schedule']['retention_days'])
+        assert expired_backups == ['expired_backup_directory01', 'expired_backup_directory02']
+
 # Mock time to 2019-01-01 00:00:00 UTC (Tuesday)
 @freeze_time('2019-01-01')
 def test_remote_link():
     """Assert remote_link() calls subprocess.run with expected options."""
     datetime = time.strftime("%Y%m%dT%H%M%S")
     with mock.patch('rsincr.subprocess.run') as mocked_subprocess_run:
+
         rsincr.remote_link(datetime,
                            TEST_CONFIG['destination']['server'],
                            TEST_CONFIG['backup_jobs']['job01']['dest_dir'])
+
     mocked_subprocess_run.assert_called_with(
         ['ssh', TEST_CONFIG['destination']['server'],
          'ln', '-sfn',
@@ -173,6 +257,7 @@ def test_validate_config():
     del config_minimal['global']['lockfile']
     del config_minimal['schedule']['full_backup_week_days']
     del config_minimal['schedule']['full_backup_month_days']
+    del config_minimal['schedule']['retention_days']
     del config_minimal['backup_jobs']['job01']['compress']
     assert rsincr.validate_config(config_minimal) is None
 

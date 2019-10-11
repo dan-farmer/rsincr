@@ -13,6 +13,7 @@ import atexit
 import os
 import time
 import subprocess
+import tempfile
 import toml
 from schema import Schema, SchemaError, Optional, Or
 import sysrsync
@@ -50,8 +51,13 @@ def main():
                config['rsync'].get('additional_rsync_opts', False),
                config['backup_jobs'][backup_job_name],
                backup_type)
-
-    #TODO: Purging # pylint: disable=fixme
+        if config['schedule'].get('retention_days', False):
+            logging.info('Purging backups older than %s days for backup job %s',
+                         config['schedule']['retention_days'], backup_job_name)
+            purge(server,
+                  config['rsync'].get('additional_rsync_opts', False),
+                  config['backup_jobs'][backup_job_name],
+                  config['schedule']['retention_days'])
 
 def get_backup_type(config):
     """Return the backup type that should be run ('incremental' or 'full')."""
@@ -98,6 +104,10 @@ def backup(server, bwlimit, additional_rsync_opts, backup_job, backup_type='incr
                  destination=os.path.join(dest_dir, datetime),
                  options=rsync_options)
 
+    logging.info('Updating mtime of %s:%s', server, os.path.join(dest_dir, datetime))
+    logging.debug('Executing \'ssh %s touch %s\'', server, os.path.join(dest_dir, datetime))
+    subprocess.run(["ssh", server, "touch", os.path.join(dest_dir, datetime)], check=True)
+
     remote_link(datetime, server, dest_dir)
 
 def remote_mkdir(server, dest_dir):
@@ -107,6 +117,46 @@ def remote_mkdir(server, dest_dir):
         logging.warning('Destination directory \'%s\' does not exist on server \'%s\'; Creating it',
                         dest_dir, server)
         subprocess.run(["ssh", server, "mkdir", "-p", dest_dir], check=True)
+
+def purge(server, additional_rsync_opts, backup_job, retention_days):
+    """Purge any backup subdirectories in server:dest_dir that are older than retention_days."""
+    dest_dir = backup_job['dest_dir']
+
+    expired_backups = get_expired_backups(server, dest_dir, retention_days)
+
+    if not expired_backups:
+        logging.info('No expired backups found in destination directory %s on server %s',
+                     dest_dir, server)
+        return
+
+    rsync_options = ['-r', '--delete']
+    if additional_rsync_opts:
+        for rsync_opt in additional_rsync_opts:
+            rsync_options.append(rsync_opt)
+
+    for expired_backup in expired_backups:
+        logging.info('Purging expired backup %s on server %s', expired_backup, server)
+        with tempfile.TemporaryDirectory() as tmp_empty_dir:
+            sysrsync.run(source=tmp_empty_dir,
+                         destination_ssh=server,
+                         destination=expired_backup,
+                         options=rsync_options)
+        subprocess.run(['ssh', server, 'rmdir', expired_backup], check=True)
+
+def get_expired_backups(server, dest_dir, retention_days):
+    """Return subdirectories of server:dest_dir that are (retention_days + 1) old, or older."""
+    find_process = subprocess.run(['ssh', server,
+                                   'find', '-H', dest_dir,
+                                   '-mindepth', '1', '-maxdepth', '1', '-type', 'd',
+                                   '-mtime', f'+{retention_days}'],
+                                  capture_output=True, check=True)
+
+    if find_process.stdout in [None, b'']:
+        return False
+
+    # find_process.stdout is a byte-string of line-separated directory names
+    # Return this as a list of utf8-converted strings
+    return list(map(lambda x: str(x, 'utf-8'), find_process.stdout.splitlines()))
 
 def remote_link(datetime, server, dest_dir):
     """Symlink 'latest' to a datetime-stamped backup directory.
@@ -158,7 +208,8 @@ def validate_config(config):
         },
         'schedule': {
             Optional('full_backup_week_days'): Or([int], []),
-            Optional('full_backup_month_days'): Or([int], [])
+            Optional('full_backup_month_days'): Or([int], []),
+            Optional('retention_days'): int
         },
         'backup_jobs': {
             str: {

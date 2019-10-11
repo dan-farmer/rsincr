@@ -40,6 +40,7 @@ The [example config file](rsincr_example_config.toml) demonstrates most configur
 ### \[schedule\]
 * full\_backup\_week\_days: List of week days (0=Sunday) on which to perform a 'full' backup (*List of integer*) (*Optional*) (**No default**)
 * full\_backup\_month\_days: List of days of the month on which to perform a 'full' backup (*List of integer*) (*Optional*) (**No default**)
+* retention\_days: Retain backups up to this number of days, and purge older backups (*Integer*) (*Optional*) (**No default**)
 
 ### \[backup\_jobs.\*\]
 Backup jobs (i.e. source/destination pairings) to backup
