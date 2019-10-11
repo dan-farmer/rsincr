@@ -24,16 +24,21 @@ def main():
     args = parse_args()
     logging.info('Execution starting using config file %s', args.config_file.name)
     config = toml.load(args.config_file)
+    logging.debug('Configuration dump: %s', config)
     validate_config(config)
 
     server = config['destination']['server']
     if args.force_full_backup:
+        logging.debug('Full backup forced by command line argument')
+        print('Backup type: Full - forcing rsync to read full files on source and dest and '
+              'compare checksums')
         backup_type = 'full'
     else:
         backup_type = get_backup_type(config)
 
-    # Lock the lockfile before we start backups to ensure we have only one instance running
     lockfile = config['global'].get('lockfile', '.rsincr.lock')
+    logging.debug('Attempting to lock lockfile %s to ensure we have only one instance running',
+                  lockfile)
     lockfile_handle = open(lockfile, 'w')
     try:
         fcntl.lockf(lockfile_handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -45,15 +50,15 @@ def main():
     atexit.register(remove_lockfile, lockfile)
 
     for backup_job_name in config['backup_jobs']:
-        logging.info('Starting backup job %s', backup_job_name)
+        print(f'Starting backup job {backup_job_name}')
         backup(server,
                config['rsync'].get('bwlimit', False),
                config['rsync'].get('additional_rsync_opts', False),
                config['backup_jobs'][backup_job_name],
                backup_type)
         if config['schedule'].get('retention_days', False):
-            logging.info('Purging backups older than %s days for backup job %s',
-                         config['schedule']['retention_days'], backup_job_name)
+            print(f'Purging backups older than {config["schedule"]["retention_days"]} days for '
+                  f'backup job {backup_job_name}')
             purge(server,
                   config['rsync'].get('additional_rsync_opts', False),
                   config['backup_jobs'][backup_job_name],
@@ -64,10 +69,11 @@ def get_backup_type(config):
 
     if int(time.strftime('%w')) in config['schedule'].get('full_backup_week_days', []) or \
             int(time.strftime('%d')) in config['schedule'].get('full_backup_month_days', []):
-        logging.info('Performing full backup')
+        print('Backup type: Full - forcing rsync to read full files on source and dest and compare '
+              'checksums')
         return 'full'
 
-    logging.info('Performing incremental backup')
+    print('Backup type: Incremental')
     return 'incremental'
 
 def backup(server, bwlimit, additional_rsync_opts, backup_job, backup_type='incremental'):
@@ -76,7 +82,10 @@ def backup(server, bwlimit, additional_rsync_opts, backup_job, backup_type='incr
     Raises RsyncError if rsync exits non-zero
     """
     datetime = time.strftime("%Y%m%dT%H%M%S")
+    logging.debug('Datetime: %s', datetime)
     source_dir, dest_dir = backup_job['source_dir'], backup_job['dest_dir']
+    logging.debug('Source: %s', source_dir)
+    logging.debug('Destination: %s:%s', server, dest_dir)
 
     remote_mkdir(server, dest_dir)
 
@@ -99,23 +108,30 @@ def backup(server, bwlimit, additional_rsync_opts, backup_job, backup_type='incr
         for exclusion in backup_job['exclude']:
             rsync_options.append(f'--exclude={exclusion}')
 
+    logging.debug('Executing \'rsync %s %s %s:%s\'',
+                  ' '.join(rsync_options), os.path.expanduser(source_dir),
+                  server, os.path.join(dest_dir, datetime))
     sysrsync.run(source=os.path.expanduser(source_dir),
                  destination_ssh=server,
                  destination=os.path.join(dest_dir, datetime),
                  options=rsync_options)
 
     logging.info('Updating mtime of %s:%s', server, os.path.join(dest_dir, datetime))
-    logging.debug('Executing \'ssh %s touch %s\'', server, os.path.join(dest_dir, datetime))
+    logging.debug('Executing \'ssh %s touch "%s"\'', server, os.path.join(dest_dir, datetime))
     subprocess.run(["ssh", server, "touch", os.path.join(dest_dir, datetime)], check=True)
 
     remote_link(datetime, server, dest_dir)
 
 def remote_mkdir(server, dest_dir):
     """Create directory on server if it does not exist."""
+    logging.info('Checking if destination directory \'%s\' exists on server \'%s\'',
+                 server, dest_dir)
+    logging.debug('Executing \'ssh %s [[ -d "%s" ]]\'', server, dest_dir)
     exists_check = subprocess.run(["ssh", server, "[[", "-d", dest_dir, "]]"], check=False)
     if not exists_check.returncode == 0:
         logging.warning('Destination directory \'%s\' does not exist on server \'%s\'; Creating it',
                         dest_dir, server)
+        logging.debug('Executing \'ssh %s mkdir -p "%s"\'', server, dest_dir)
         subprocess.run(["ssh", server, "mkdir", "-p", dest_dir], check=True)
 
 def purge(server, additional_rsync_opts, backup_job, retention_days):
@@ -135,16 +151,21 @@ def purge(server, additional_rsync_opts, backup_job, retention_days):
             rsync_options.append(rsync_opt)
 
     for expired_backup in expired_backups:
-        logging.info('Purging expired backup %s on server %s', expired_backup, server)
+        print(f'Purging expired backup {expired_backup} on server {server}')
         with tempfile.TemporaryDirectory() as tmp_empty_dir:
+            logging.debug('Executing \'rsync %s %s %s:%s\'',
+                          ' '.join(rsync_options), tmp_empty_dir, server, expired_backup)
             sysrsync.run(source=tmp_empty_dir,
                          destination_ssh=server,
                          destination=expired_backup,
                          options=rsync_options)
+        logging.debug('Executing \'ssh %s rmdir "%s"\'', server, expired_backup)
         subprocess.run(['ssh', server, 'rmdir', expired_backup], check=True)
 
 def get_expired_backups(server, dest_dir, retention_days):
     """Return subdirectories of server:dest_dir that are (retention_days + 1) old, or older."""
+    logging.debug('Executing \'ssh %s find -H "%s" -mindepth +%s\'',
+                  server, dest_dir, retention_days)
     find_process = subprocess.run(['ssh', server,
                                    'find', '-H', dest_dir,
                                    '-mindepth', '1', '-maxdepth', '1', '-type', 'd',
@@ -164,6 +185,8 @@ def remote_link(datetime, server, dest_dir):
     Raises CalledProcessError on failure
     """
     logging.info('Symlinking \'latest\' to \'%s\'', datetime)
+    logging.debug('Executing \'ssh %s ln -sfn %s %s\'',
+                  server, datetime, os.path.join(dest_dir, 'latest'))
     subprocess.run(["ssh", server, "ln", "-sfn", datetime, os.path.join(dest_dir, 'latest')],
                    check=True)
 
@@ -224,10 +247,12 @@ def validate_config(config):
     try:
         config_schema.validate(config)
     except SchemaError as exception:
+        logging.error('Could not validate config')
         sys.exit(exception.code)
 
 def remove_lockfile(lockfile):
     """Cleanup function to remove lockfile when we exit."""
+    logging.debug('Cleaning up (removing) lockfile %s', lockfile)
     os.remove(lockfile)
 
 if __name__ == '__main__':
