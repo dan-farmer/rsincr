@@ -101,3 +101,6 @@ Backup jobs (i.e. source/destination pairings) to backup. At least one backup jo
 | dest\_dir | String | **Yes** | None | Destination directory on backup server (*Note that files will be backed up to a separate timestamped subdirectory per backup*) |
 | compress | Boolean | No | False | Compress files in transfer (`rsync -z`) |
 | exclude | List of string | No | None | Files or path patterns to exclude - see `man 1 rsync` for pattern rules |
+
+## Legacy Shell Version
+A legacy version of rsincr written in shell (bash) can be found in [legacy\_shell/](legacy_shell/). It is unmaintained, and should not be used unless the python version cannot be used (e.g. due to dependencies).
