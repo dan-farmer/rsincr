@@ -1,0 +1,27 @@
+[global]
+#lockfile = ".rsincr.lock"
+
+[rsync]
+#bwlimit = "1.5m"
+#additional_rsync_opts = ["--safe-links",
+#                         "--acls",
+#                         "--xattrs"]
+
+[destination]
+server = "user@backup_server"
+
+[schedule]
+full_backup_week_days = [0, 3]
+full_backup_month_days = [14, 28]
+
+[backup_jobs.documents]
+source_dir = "~/Documents"
+dest_dir = "/mnt/backups/Documents"
+compress = true
+
+[backup_jobs.pictures]
+source_dir = "/home/user/Pictures"
+dest_dir = "/mnt/backups/Pictures"
+compress = false
+exclude = ["excluded_file",
+           "excluded_directory/***"]

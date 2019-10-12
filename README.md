@@ -1,66 +1,106 @@
-# rsincr.sh
+# rsincr
 RSync INCRemental backup: Simple, fast, incremental backups with rsync.
 
 ## Description
-Wrapper around [rsync](https://rsync.samba.org/) to perform incremental backups with --link-dest. Each dated backup folder is a full backup and may be treated independently (deleted etc), but duplicate files from previous backup are hard-linked, so only use incremental disk space.
+Wrapper around [rsync](https://rsync.samba.org/) to perform incremental backups by hard-linking unchanged files on the filesystem (a.k.a. `rsync --link-dest`). Each dated backup directory is a full backup and may be treated independently (deleted etc), but duplicate files from previous backup are hard-linked on the filesystem, so only use incremental disk space.
 
-There are other (better?) solutions to the same problem - DIY guides, pre-existing wrappers around rsync, and dedicated backup tools. rsincr.sh provides a robust, efficient, simple and fast solution to my own needs, but I encourage you to evaluate and test other solutions in comparison to rsincr.sh to find what best fits your own requirements.
+### Advantages
+1. Backed up directories and files are accessible on the destination server filesystem (no special tools needed to examine, list, or partially/fully-restore a backup)
+1. After the initial backup, unchanged files never need to be transferred or stored again, even for a 'full' backup
+   * A 'full' backup simply forces rsync to read the full file contents on both filesystems (source and destination) and compare them by checksum. If the file is unchanged on the destination filesystem, a new hard-link is made to it in the dated backup. If the file is changed or new, it will be created as a new file.
+   * This makes rsincr extremely well-suited to situations where full transfers or stores of the backup data are costly or time-consuming, e.g. Large backup sets at sites with limited upload bandwidth
 
-This was mostly written as a technical exercise - i.e. see how functional a shell/bash script I could write, combined with poor experience and NIH fear of other solutions. It may be rewritten in Python in future. I'm currently using it for 6-hourly backups from a home NAS to off-site, as well as a handful of other applications.
-
-## Usage
-./rsincr.sh --help
-
-## Logical Operations
-- A new dated backup folder is created
-- Unchanged files are hard-linked to the existing copy from the last backup
-- New or changed files are copied in as new files
-- A 'latest' symlink is pointed at the completed backup folder
-- Optionally, backups older than a configured number of days are purged
-  - This is accomplished by rsync-ing an empty folder over the top, as this is faster on spinning media than a simple 'rm'
-
-## Features
-- Remote or local backup destination
-- Performs basic tests prior to beginning backup, e.g.:
-  - Remote host connectivity
-  - Existence of source directory
-  - Existence of destination directory on remote host
-- Optionally purge backups older than X days
-- (Somewhat) intelligently handles errors from rsync
-- Pretty-ish output/logging
-- Define configuration files for independent backup jobs - configuration options:
-  - Lockfile
-  - rsync options
-  - Additional rsync options for interactive and non-interactive execution
-  - Remote or local backup destination
-  - Remote host, user
-  - Source and (local|remote) destination path
-  - When to perform a full backup
-  - Age of backups to purge
-- Different log formatting and additional rsync options for:
-  1. Interactive (TTY) execution - e.g. give real-time feedback on progress
-  2. Non-interactive (cron) execution - e.g. give a summary and don't spam the logs
-- Perform a fresh full backup (write new files and don't hardlink to existing files, attempting to avoid bitrot):
-  - Never
-  - Every time
-  - On certain days of the month
-  - On certain days of the week
-
-## Limitations
-- File metadata (owner, in particular) may not be faithfully reproduced if the owner does not exist on the remote backup host
-  - Backups using tar and other more complex tools are designed to perfectly-preserve file metadata
-- By design, backups are not encrypted, de-duplicated, or compressed
-  - The intention is for the backup to be a transparent, trivially-restorable copy of the data
-  - Compression on the wire may be accomplished with appropriate rsync options (-z)
-  - Compression on-disk may be accomplished at the filesystem or volume level if required. For backups of data that is already compressed (e.g. Photographs etc) this would not be necessary or desirable.
-  - Encryption on-disk may be accomplished at the volume level
-    - Be aware of the limitations here (e.g. data is accessible while the host is online and would be compromised in the event of malicious access to the remote host)
-    - In future I may add a feature to mount/unmount an encrypted volume on the remote host using a passphrase or key saved on the source host, which would provide a partial solution to this problem
+### Disadvantages
+1. By design, backups are not encrypted, de-duplicated, compressed, or signed/sealed
+   * Compression on-disk may be accomplished at the filesystem or volume level if required
+   * Encryption on-disk may be accomplished at the volume level
+     * Be aware that data is accessible while the backup filesystem is mounted and would be compromised in the event of malicious access to the destination server
+     * Potential future enhancement: Mount/unmount an encrypted volume on the destination server using a passphrase or key saved on the source host config
+1. File metadata (owner, in particular) may not be faithfully reproduced if the owner does not exist on the remote backup host
 
 ## Requirements
-1. bash (version TBC) (makes moderate to heavy use of bashisms, won't execute with pure POSIX shells)
-2. rsync (any version, but default config uses options only found in 3.1+)
-3. The destination filesystem should allow hard linking
+* Source system:
+  * Python 3.6+
+  * Python modules from [requirements.txt](requirements.txt)
+  * rsync (any version in recent history, but 3.0+ (2008) recommended)
+* Backup destination server:
+  * rsync (any version in recent history, but 3.0+ (2008) recommended)
+  * GNU `find`
+  * Filesystem must support hard links
 
-## Performance
-TODO
+## Usage
+
+### Installation
+```
+git clone https://github.com/reedbug/rsincr.git   # Or git@github.com:reedbug/rsincr.git
+cd rsincr/
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+### Scheduling
+* The [example config file](rsincr_example_config.toml) demonstrates most configuration options, or see [configuration reference](#configuration-reference) below. Minimum configuration items needed to perform a backup:
+  * Server
+  * At least one backup job, with:
+    * Source path
+    * Destination path
+* Once a configuration file has been setup, `rsincr.py` is suitable for execution from a cron job / systemd timer, e.g. on a weekly/nightly/6-hourly basis, etc:
+  ```
+  source venv/bin/activate && ./rsincr.py
+  ```
+* Failures or other errors will be output as normal and the process will exit with a failure, so it is advisable to configure the cron job / system to email failure outputs to a real person
+
+### Command Line Arguments
+```
+./rsincr.py [-h] [-l {DEBUG,INFO,WARNING,ERROR,CRITICAL}]
+                 [-c CONFIG_FILE] [-f FORCE_FULL_BACKUP]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -l {DEBUG,INFO,WARNING,ERROR,CRITICAL}, --loglevel {DEBUG,INFO,WARNING,ERROR,CRITICAL}
+                        Logging/output verbosity
+  -c CONFIG_FILE, --config-file CONFIG_FILE
+                        Config file (default: rsincr.toml)
+  -f FORCE_FULL_BACKUP, --force-full-backup FORCE_FULL_BACKUP
+                        Force a 'full' backup (compare checksums of files on
+                        both sides), regardless of schedule
+```
+
+### Configuration Reference
+
+#### \[global\]
+| Config key | Type | Required | Default | Description |
+| ---------- | ---- | -------- | ------- | ----------- |
+| lockfile | String | No | `.rsincr.lock` | Lockfile used to ensure only one instance is running |
+
+#### \[rsync\]
+| Config key | Type | Required | Default | Description |
+| ---------- | ---- | -------- | ------- | ----------- |
+| bwlimit | String | No | None | Bandwidth limit for rsync; Any string that is interpretable by rsync - see `man 1 rsync` |
+| additional\_rsync\_opts | List of string | No | None | Arbitrary additional options to pass to rsync - see `man 1 rsync` |
+
+#### \[destination\]
+| Config key | Type | Required | Default | Description |
+| ---------- | ---- | -------- | ------- | ----------- |
+| server | String | **Yes** | None | Backup destination server in the form of 'hostname' or 'user@hostname' |
+
+#### \[schedule\]
+| Config key | Type | Required | Default | Description |
+| ---------- | ---- | -------- | ------- | ----------- |
+| full\_backup\_week\_days | List of integer | No | None | List of week days (0=Sunday) on which to perform a 'full' backup |
+| full\_backup\_month\_days | List of integer | No | None | List of days of the month on which to perform a 'full' backup |
+| retention\_days | Integer | No | None | Retain backups up to this number of days, and purge older backups |
+
+#### \[backup\_jobs.\*\]
+Backup jobs (i.e. source/destination pairings) to backup. At least one backup job must exist.
+
+| Config key | Type | Required | Default | Description |
+| ---------- | ---- | -------- | ------- | ----------- |
+| source\_dir | String | **Yes** | None | Source directory on local host |
+| dest\_dir | String | **Yes** | None | Destination directory on backup server (*Note that files will be backed up to a separate timestamped subdirectory per backup*) |
+| compress | Boolean | No | False | Compress files in transfer (`rsync -z`) |
+| exclude | List of string | No | None | Files or path patterns to exclude - see `man 1 rsync` for pattern rules |
+
+## Legacy Shell Version
+A legacy version of rsincr written in shell (bash) can be found in [legacy\_shell/](legacy_shell/). It is unmaintained, and should not be used unless the python version cannot be used (e.g. due to dependencies).
