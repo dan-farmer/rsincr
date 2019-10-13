@@ -19,7 +19,7 @@ Wrapper around [rsync](https://rsync.samba.org/) to perform incremental backups 
 1. File metadata (owner, in particular) may not be faithfully reproduced if the owner does not exist on the remote backup host
 
 ## Requirements
-* Source system:
+* Local system (backup source):
   * Python 3.6+
   * Python modules from [requirements.txt](requirements.txt)
   * rsync (any version in recent history, but 3.0+ (2008) recommended)
@@ -99,7 +99,7 @@ Backup jobs (i.e. source/destination pairings) to backup. At least one backup jo
 | ---------- | ---- | -------- | ------- | ----------- |
 | source\_dir | String | **Yes** | None | Source directory on local host |
 | dest\_dir | String | **Yes** | None | Destination directory on backup server (*Note that files will be backed up to a separate timestamped subdirectory per backup*) |
-| compress | Boolean | No | False | Compress files in transfer (`rsync -z`) |
+| compress | Boolean | No | false | Compress files in transfer (`rsync -z`) |
 | exclude | List of string | No | None | Files or path patterns to exclude - see `man 1 rsync` for pattern rules |
 
 ## Legacy Shell Version
