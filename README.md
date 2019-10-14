@@ -40,16 +40,27 @@ pip install -r requirements.txt
 ```
 
 ### Scheduling
-* The [example config file](rsincr_example_config.toml) demonstrates most configuration options, or see [configuration reference](#configuration-reference) below. Minimum configuration items needed to perform a backup:
-  * Server
-  * At least one backup job, with:
-    * Source path
-    * Destination path
-* Once a configuration file has been setup, `rsincr.py` is suitable for execution from a cron job / systemd timer, e.g. on a weekly/nightly/6-hourly basis, etc:
+
+#### Minimum configuration
+Minimum configuration items needed to perform a backup:
+* Server
+* At least one backup job, with:
+  * Source path
+  * Destination path
+The [example config file](rsincr_example_config.toml) demonstrates most configuration options, or see [configuration reference](#configuration-reference) below.
+
+#### Cron Job
+* Example (6-hourly backups, outputting to a logfile):
   ```
-  source venv/bin/activate && ./rsincr.py
+  0  */6  *  *  * cd ~/rsincr; venv/bin/python rsincr.py >> logs/$(date "+\%FT\%T").log
   ```
 * Failures or other errors will be output as normal and the process will exit with a failure, so it is advisable to configure the cron job / system to email failure outputs to a real person
+
+#### systemd Timer
+* It is recommended to schedule using a cron job (in a plain user's crontab), since:
+  * rsincr requires execution as a real user with an SSH key etc setup for access to the remote destination server
+  * systemd has no native functionality to email notifications of failures in service units (even when triggered by systemd timer units), necessitating a workaround 'service' unit for these notifications
+* Example systemd service and timer units (including a service for emailing failure notifications) can be found in [example\_systemd\_units/](example_systemd_units/)
 
 ### Command Line Arguments
 ```

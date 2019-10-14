@@ -1,0 +1,6 @@
+[Unit]
+Description=Email notification of unit failure to root
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/bash -c '/usr/bin/systemctl status %i | /usr/bin/mailx -Ssendwait -s "%i Failure" root'

@@ -1,6 +1,7 @@
-# Default local config and lock files
+# Default local config, lock files, documented log directory example
 rsincr.toml
 .rsincr.lock
+logs/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
