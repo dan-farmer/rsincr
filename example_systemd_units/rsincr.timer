@@ -1,0 +1,15 @@
+[Unit]
+Description=rsincr Backups Timer
+Wants=network-online.target
+
+[Timer]
+# Every 6 hours
+#OnCalendar=*-*-* 00,06,12,18:00:00
+# Daily at 03:00:00
+OnCalendar=*-*-* 03:00:00
+# Weekly on Sunday at 00:00:00
+#OnCalendar=Sun
+Unit=rsincr.service
+
+[Install]
+WantedBy=multi-user.target

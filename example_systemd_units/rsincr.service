@@ -1,0 +1,11 @@
+[Unit]
+Description=rsincr Backups
+Documentation=https://github.com/reedbug/rsincr
+After=network.target
+OnFailure=email-notification@%n.service
+
+[Service]
+Type=simple
+User=backup_user
+WorkingDirectory=/opt/rsincr
+ExecStart=/opt/rsincr/venv/bin/python rsincr.py
