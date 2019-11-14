@@ -123,10 +123,24 @@ def test_remote_mkdir():
         mocked_subprocess_run.return_value.returncode = 0
         rsincr.remote_mkdir(SERVER, DEST_DIR)
         mocked_subprocess_run.assert_called_once_with(
-            ['ssh', SERVER, '[[', '-d', DEST_DIR, ']]'], check=False)
+            ['ssh', SERVER, '[[', '-d', DEST_DIR, ']]'], check=False, capture_output=True)
 
-        # If directory check fails, subprocess.run will be called a second time to mkdir
+        # If directory check errors out, subprocess.run should be called but followed by an
+        # exception
+        mocked_subprocess_run.return_value.returncode = 1
+        mocked_subprocess_run.return_value.stdout = b'Test stdout'
+        mocked_subprocess_run.return_value.stderr = b'Test stderr'
+        with pytest.raises(Exception) as pytest_wrapped_e_dirtest_stdout:
+            rsincr.remote_mkdir(SERVER, DEST_DIR)
+        mocked_subprocess_run.assert_called_with(
+            ['ssh', SERVER, '[[', '-d', DEST_DIR, ']]'], check=False, capture_output=True)
+        assert pytest_wrapped_e_dirtest_stdout.type == Exception
+
+        # If directory check reports directory does not exist, subprocess.run will be called a
+        # second time to mkdir
         mocked_subprocess_run.return_value.returncode = [1, 0]
+        mocked_subprocess_run.return_value.stdout = ''
+        mocked_subprocess_run.return_value.stderr = ''
         rsincr.remote_mkdir(SERVER, DEST_DIR)
         mocked_subprocess_run.assert_called_with(['ssh', SERVER, 'mkdir', '-p', DEST_DIR],
                                                  check=True)

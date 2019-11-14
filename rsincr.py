@@ -125,10 +125,20 @@ def backup(server, bwlimit, additional_rsync_opts, backup_job, backup_type='incr
 def remote_mkdir(server, dest_dir):
     """Create directory on server if it does not exist."""
     logging.info('Checking if destination directory \'%s\' exists on server \'%s\'',
-                 server, dest_dir)
+                 dest_dir, server)
     logging.debug('Executing \'ssh %s [[ -d "%s" ]]\'', server, dest_dir)
-    exists_check = subprocess.run(["ssh", server, "[[", "-d", dest_dir, "]]"], check=False)
+    exists_check = subprocess.run(["ssh", server, "[[", "-d", dest_dir, "]]"], check=False,
+                                  capture_output=True)
     if not exists_check.returncode == 0:
+        if exists_check.stdout or exists_check.stderr:
+            # Bash '[[ -d ]]' test should output nothing even if the directory does not exist.
+            # If we have output, something went wrong (e.g. we couldn't SSH to server).
+            logging.error(
+                'Unexpected output checking for existence of directory \'%s\' on server \'%s\'',
+                dest_dir, server)
+            logging.error('stdout: %s', str(exists_check.stdout, 'utf-8'))
+            logging.error('stderr: %s', str(exists_check.stderr, 'utf-8'))
+            raise Exception('Unexpected output checking for existence of remote directory')
         logging.warning('Destination directory \'%s\' does not exist on server \'%s\'; Creating it',
                         dest_dir, server)
         logging.debug('Executing \'ssh %s mkdir -p "%s"\'', server, dest_dir)
