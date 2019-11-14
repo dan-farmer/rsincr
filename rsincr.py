@@ -125,7 +125,7 @@ def backup(server, bwlimit, additional_rsync_opts, backup_job, backup_type='incr
 def remote_mkdir(server, dest_dir):
     """Create directory on server if it does not exist."""
     logging.info('Checking if destination directory \'%s\' exists on server \'%s\'',
-                 server, dest_dir)
+                 dest_dir, server)
     logging.debug('Executing \'ssh %s [[ -d "%s" ]]\'', server, dest_dir)
     exists_check = subprocess.run(["ssh", server, "[[", "-d", dest_dir, "]]"], check=False,
                                   capture_output=True)
